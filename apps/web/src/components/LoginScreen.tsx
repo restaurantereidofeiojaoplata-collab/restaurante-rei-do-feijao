@@ -33,8 +33,11 @@ const formatSlug = (val: string): string => {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '') // remove accents
-    .replace(/[^a-z0-9]/g, ''); // remove everything except lowercase letters and numbers (no dashes!)
+    .replace(/[\s._,\/]+/g, '-') // replace spaces, dots, underscores, commas, slashes with a single dash
+    .replace(/[^a-z0-9-]/g, '') // remove non-alphanumeric, non-dash characters
+    .replace(/-+/g, '-'); // replace multiple consecutive dashes with a single dash
 };
+
 
 
 /** Fetch public IP and location directly from client side */
