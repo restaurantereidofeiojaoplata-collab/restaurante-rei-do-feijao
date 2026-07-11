@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -15,6 +16,7 @@ import {
 import { motion } from 'motion/react';
 import { ViewType } from '../hooks/useAppState';
 import { Employee } from '../types';
+import { ProfileModal } from './ProfileModal';
 
 interface SidebarProps {
   activeView: ViewType;
@@ -23,6 +25,7 @@ interface SidebarProps {
   onLogout: () => void;
   isCollapsed: boolean;
   setIsCollapsed: (c: boolean) => void;
+  onUpdateProfile: (updated: Partial<Employee>) => void;
 }
 
 export function Sidebar({
@@ -31,8 +34,11 @@ export function Sidebar({
   currentUser,
   onLogout,
   isCollapsed,
-  setIsCollapsed
+  setIsCollapsed,
+  onUpdateProfile
 }: SidebarProps) {
+  const [showProfileModal, setShowProfileModal] = useState(false);
+
   const menuItems = [
     { id: 'dashboard', label: 'Painel Geral', icon: LayoutDashboard },
     { id: 'pdv', label: 'PDV (Caixa)', icon: ShoppingCart },
@@ -140,27 +146,33 @@ export function Sidebar({
       {/* Current Operator Footer */}
       {currentUser && (
         <div className="border-t border-neutral-200 p-4 shrink-0 bg-neutral-50/30">
-          <div className="flex items-center gap-3">
-            <img
-              src={currentUser.avatar}
-              alt={currentUser.name}
-              className="w-10 h-10 rounded-full border-2 border-emerald-500 object-cover shrink-0"
-              referrerPolicy="no-referrer"
-            />
-            {!isCollapsed && (
-              <div className="flex-1 overflow-hidden">
-                <h4 className="text-sm font-bold text-neutral-900 truncate">
-                  {currentUser.name}
-                </h4>
-                <p className="text-[11px] text-neutral-500 font-bold uppercase tracking-wider truncate">
-                  {getRoleLabel(currentUser.role)}
-                </p>
-              </div>
-            )}
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => setShowProfileModal(true)}
+              className="flex flex-1 items-center gap-3 text-left overflow-hidden group hover:bg-neutral-100/85 p-1.5 rounded-2xl border border-transparent hover:border-neutral-200 transition-all duration-250 cursor-pointer"
+              title="Configurar Perfil e Foto"
+            >
+              <img
+                src={currentUser.avatar}
+                alt={currentUser.name}
+                className="w-10 h-10 rounded-full border-2 border-emerald-500 object-cover shrink-0 transition-transform duration-250 group-hover:scale-105"
+                referrerPolicy="no-referrer"
+              />
+              {!isCollapsed && (
+                <div className="flex-1 overflow-hidden">
+                  <h4 className="text-sm font-bold text-neutral-900 truncate group-hover:text-emerald-700 transition-colors">
+                    {currentUser.name}
+                  </h4>
+                  <p className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider truncate">
+                    {getRoleLabel(currentUser.role)}
+                  </p>
+                </div>
+              )}
+            </button>
             {!isCollapsed && (
               <button
                 onClick={onLogout}
-                className="p-1.5 rounded-lg text-neutral-500 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-100 transition"
+                className="p-2 rounded-xl text-neutral-500 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-100 transition duration-200 cursor-pointer"
                 title="Sair do Sistema"
               >
                 <LogOut className="w-4 h-4" />
@@ -170,7 +182,7 @@ export function Sidebar({
           {isCollapsed && (
             <button
               onClick={onLogout}
-              className="w-full mt-3 p-2 bg-neutral-100 border border-neutral-200 rounded-lg text-neutral-600 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition flex justify-center"
+              className="w-full mt-3 p-2 bg-neutral-100 border border-neutral-200 rounded-xl text-neutral-600 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition flex justify-center cursor-pointer"
               title="Sair do Sistema"
             >
               <LogOut className="w-4 h-4" />
@@ -178,6 +190,16 @@ export function Sidebar({
           )}
         </div>
       )}
+
+      {/* Profile Settings Modal */}
+      <ProfileModal
+        isOpen={showProfileModal}
+        onClose={() => setShowProfileModal(false)}
+        currentUser={currentUser}
+        onUpdateProfile={onUpdateProfile}
+        onLogout={onLogout}
+        onChangeView={onChangeView}
+      />
     </aside>
   );
 }

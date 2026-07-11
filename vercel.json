@@ -1,0 +1,6 @@
+{
+  "buildCommand": "pnpm --filter @restaurante/domain build && pnpm --filter @restaurante/web build",
+  "outputDirectory": "apps/web/dist",
+  "framework": "vite",
+  "installCommand": "corepack enable && corepack prepare pnpm@9.14.4 --activate && pnpm install"
+}

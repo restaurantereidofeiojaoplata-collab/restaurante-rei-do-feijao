@@ -275,7 +275,9 @@ export default function App() {
           onLogout={logout}
           isCollapsed={isSidebarCollapsed}
           setIsCollapsed={setIsSidebarCollapsed}
+          onUpdateProfile={updateProfile}
         />
+
 
         {/* Content body area wrapper */}
         <div className="flex-1 flex flex-col min-h-screen overflow-hidden">
