@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { Injectable } from "@nestjs/common";
+import { Injectable, Optional } from "@nestjs/common";
+
 import { loadDatabaseEnvFiles } from "@restaurante/database";
 import type { CurrentSession } from "./current-session.js";
 
@@ -32,7 +33,8 @@ export class SessionTokenService {
   private readonly now: () => Date;
   private readonly secret: string;
 
-  constructor(options: SessionTokenOptions = {}) {
+  constructor(@Optional() options: SessionTokenOptions = {}) {
+
     loadDatabaseEnvFiles();
 
     this.expiresInSeconds = options.expiresInSeconds ?? 60 * 60 * 8;
