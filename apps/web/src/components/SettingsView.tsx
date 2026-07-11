@@ -22,8 +22,10 @@ import {
   Tablet,
   MapPin,
   Clock,
-  ChevronLeft
+  ChevronLeft,
+  Upload
 } from 'lucide-react';
+
 import { motion, AnimatePresence } from 'motion/react';
 import { api } from '../services/api';
 
@@ -42,10 +44,21 @@ export function SettingsView({ currentUser, onUpdateProfile, onResetData, onOpen
   const [profileName, setProfileName] = useState(currentUser?.name || '');
   const [profileEmail, setProfileEmail] = useState(currentUser?.email || '');
   const [profilePassword, setProfilePassword] = useState('');
+  const [profileAvatar, setProfileAvatar] = useState(currentUser?.avatar || '');
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSuccess, setProfileSuccess] = useState<string | null>(null);
   const [showProfilePassword, setShowProfilePassword] = useState(false);
+
+  // Sync profile fields when currentUser changes
+  useEffect(() => {
+    if (currentUser) {
+      setProfileName(currentUser.name || '');
+      setProfileEmail(currentUser.email || '');
+      setProfileAvatar(currentUser.avatar || '');
+    }
+  }, [currentUser]);
+
 
   // Device management dashboard states
   const [deviceSessions, setDeviceSessions] = useState<any[]>([]);
@@ -179,11 +192,13 @@ export function SettingsView({ currentUser, onUpdateProfile, onResetData, onOpen
       if (response.success) {
         onUpdateProfile({
           name: response.user.name,
-          email: response.user.email
+          email: response.user.email,
+          avatar: profileAvatar
         });
         setProfilePassword('');
         setProfileSuccess('Informações de perfil atualizadas com sucesso!');
       }
+
     } catch (err: any) {
       console.error('Profile update error:', err);
       setProfileError(err.message || 'Erro ao atualizar informações do perfil.');
@@ -414,10 +429,53 @@ export function SettingsView({ currentUser, onUpdateProfile, onResetData, onOpen
               )}
 
               <div className="space-y-4 pt-3 border-t border-neutral-200">
+                {/* Photo Upload Section */}
+                <div className="flex flex-col sm:flex-row items-center gap-4 p-4 bg-neutral-50 border border-neutral-200 rounded-2xl">
+                  <img
+                    src={profileAvatar}
+                    alt={profileName}
+                    className="w-16 h-16 rounded-full border-2 border-emerald-500 object-cover shrink-0"
+                  />
+                  <div className="space-y-1 text-center sm:text-left flex-1">
+                    <h4 className="text-xs font-black text-neutral-900">Foto de Perfil</h4>
+                    <p className="text-[10px] text-neutral-500 font-bold">Faça upload de uma foto personalizada do seu computador (Máx 2MB).</p>
+                    <button
+                      type="button"
+                      onClick={() => document.getElementById('settings-avatar-upload')?.click()}
+                      className="mx-auto sm:mx-0 px-3.5 py-1.5 border border-neutral-250 text-neutral-700 bg-white rounded-lg font-black text-[9px] uppercase hover:bg-neutral-50 transition flex items-center gap-1 shadow-sm cursor-pointer"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      Fazer Upload
+                    </button>
+                    <input
+                      type="file"
+                      id="settings-avatar-upload"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (file.size > 2 * 1024 * 1024) {
+                          alert('A imagem é muito grande. Escolha uma foto com no máximo 2MB.');
+                          return;
+                        }
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          if (typeof reader.result === 'string') {
+                            setProfileAvatar(reader.result);
+                          }
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                  </div>
+                </div>
+
                 {/* Meta details (Read-only) */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-[10px] font-black uppercase text-neutral-500">ID de Usuário</label>
+
                     <input
                       type="text"
                       disabled
