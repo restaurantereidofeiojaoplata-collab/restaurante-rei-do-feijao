@@ -28,6 +28,16 @@ async function generateDeviceFingerprint(): Promise<string> {
   }
 }
 
+const formatSlug = (val: string): string => {
+  return val
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // remove accents
+    .replace(/[\s._,\/]+/g, '-') // replace spaces, dots, underscores, commas, slashes with a single dash
+    .replace(/[^a-z0-9-]/g, '') // remove non-alphanumeric, non-dash characters
+    .replace(/-+/g, '-'); // replace multiple consecutive dashes with a single dash
+};
+
 /** Fetch public IP and location directly from client side */
 async function fetchClientGeo(): Promise<{ ip: string; location: string } | null> {
   try {
@@ -122,15 +132,9 @@ export function LoginScreen({ onLogin, onDeviceApprovalRequired }: LoginScreenPr
 
   const handleRestNameChange = (val: string) => {
     setRegRestName(val);
-    setRegRestSlug(
-      val
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/(^-|-$)/g, '')
-    );
+    setRegRestSlug(formatSlug(val));
   };
+
 
   const handleCnpjChange = (val: string) => {
     const cleanCnpj = val.replace(/\D/g, '').substring(0, 14);
@@ -213,7 +217,7 @@ export function LoginScreen({ onLogin, onDeviceApprovalRequired }: LoginScreenPr
     try {
       await api.post('/auth/register', {
         restaurantName: regRestName.trim(),
-        restaurantSlug: regRestSlug.trim(),
+        restaurantSlug: regRestSlug.replace(/(^-|-$)/g, '').trim(),
         cnpj: cleanCnpj,
         niche: regNiche,
         addressCep: cleanCep,
@@ -232,7 +236,8 @@ export function LoginScreen({ onLogin, onDeviceApprovalRequired }: LoginScreenPr
       setSuccessMsg(`Restaurante "${regRestName}" cadastrado com sucesso! Faça seu login.`);
       
       // Auto-fill login screen
-      setRestaurantSlug(regRestSlug.trim());
+      setRestaurantSlug(regRestSlug.replace(/(^-|-$)/g, '').trim());
+
       setEmail(regAdminEmail.trim());
       setPassword(regAdminPassword);
       
@@ -278,12 +283,14 @@ export function LoginScreen({ onLogin, onDeviceApprovalRequired }: LoginScreenPr
     try {
       // Generate device fingerprint before sending login request
       const fingerprint = await generateDeviceFingerprint();
+      const cleanedSlug = restaurantSlug.replace(/(^-|-$)/g, '').trim();
       const clientGeo = await fetchClientGeo();
+
 
       const data = await api.post('/auth/login', {
         email: email.trim(),
         password: password,
-        restaurantSlug: restaurantSlug.trim(),
+        restaurantSlug: cleanedSlug,
         deviceFingerprint: fingerprint,
         clientIp: clientGeo?.ip,
         clientLocation: clientGeo?.location
@@ -302,11 +309,12 @@ export function LoginScreen({ onLogin, onDeviceApprovalRequired }: LoginScreenPr
         onDeviceApprovalRequired({
           sessionId: data.deviceSessionId,
           restaurantId: data.restaurantId || '',
-          restaurantSlug: restaurantSlug.trim()
+          restaurantSlug: cleanedSlug
         });
         setIsLoading(false);
         return;
       }
+
 
       api.token = data.accessToken;
       
@@ -503,7 +511,8 @@ export function LoginScreen({ onLogin, onDeviceApprovalRequired }: LoginScreenPr
                       type="text"
                       required
                       value={restaurantSlug}
-                      onChange={(e) => setRestaurantSlug(e.target.value)}
+                      onChange={(e) => setRestaurantSlug(formatSlug(e.target.value))}
+
                       autoComplete="organization"
                       className="w-full bg-neutral-50 border border-neutral-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/10 rounded-xl py-3.5 pl-11 pr-4 text-xs font-bold text-neutral-900 focus:outline-none transition-all placeholder-neutral-400"
                       placeholder="Ex: rei-do-feijao"
@@ -635,7 +644,7 @@ export function LoginScreen({ onLogin, onDeviceApprovalRequired }: LoginScreenPr
                           type="text"
                           required
                           value={regRestSlug}
-                          onChange={(e) => setRegRestSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, ''))}
+                          onChange={(e) => setRegRestSlug(formatSlug(e.target.value))}
                           className="w-full bg-neutral-50 border border-neutral-200 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/10 rounded-xl py-3.5 pl-11 pr-4 text-xs font-bold text-neutral-900 focus:outline-none transition-all placeholder-neutral-400"
                           placeholder="Ex: dom-henrique"
                         />
