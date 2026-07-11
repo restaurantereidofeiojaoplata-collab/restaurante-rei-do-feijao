@@ -1,0 +1,34 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700;850&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-emerald-50: #f0f8ff;
+  --color-emerald-100: #d2efff;
+  --color-emerald-150: #bae6fd; /* light blue for borders */
+  --color-emerald-200: #bae6fd;
+  --color-emerald-250: #64c6ff;
+  --color-emerald-300: #64c6ff;
+  --color-emerald-400: #32b8ff;
+  --color-emerald-500: #00BFFF; /* Sistematize Electric Blue */
+  --color-emerald-600: #074ECA; /* Royal Blue */
+  --color-emerald-700: #7C3AED; /* Grad Purple */
+  --color-emerald-800: #6B1F9E; /* Logo Strong Purple */
+  --color-emerald-850: #3D0B6F; /* Deep Purple Text */
+  --color-emerald-900: #2a0352;
+  --color-emerald-950: #090514; /* Deep Purple Black */
+}
+
+/* Force disable dark mode entirely */
+@variant dark (.never-match-class &);
+
+/* Custom scrollbar hiding helper */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

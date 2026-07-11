@@ -1,0 +1,48 @@
+services:
+  - type: web
+    name: rei-do-feijao-api
+    runtime: node
+    region: oregon
+    plan: free
+    buildCommand: corepack enable && corepack prepare pnpm@9.14.4 --activate && pnpm install --frozen-lockfile && pnpm typecheck && pnpm test && pnpm --filter @restaurante/database build && pnpm --filter @restaurante/domain build && pnpm --filter @restaurante/api build
+    preDeployCommand: pnpm --filter @restaurante/database db:migrate
+    startCommand: pnpm --filter @restaurante/api start
+    healthCheckPath: /v1/health/live
+    envVars:
+      - key: NODE_VERSION
+        value: 20.12.2
+      - key: SUPABASE_PROJECT_REF
+        value: pacxidxtaykctyqenbat
+      - key: SUPABASE_URL
+        value: https://pacxidxtaykctyqenbat.supabase.co
+      - key: SUPABASE_DB_HOST
+        value: aws-1-us-west-2.pooler.supabase.com
+      - key: SUPABASE_DIRECT_DB_HOST
+        value: db.pacxidxtaykctyqenbat.supabase.co
+      - key: SUPABASE_POOLER_HOST
+        value: aws-1-us-west-2.pooler.supabase.com
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_DATABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+
+  - type: static
+    name: rei-do-feijao-web
+    buildCommand: corepack enable && corepack prepare pnpm@9.14.4 --activate && pnpm install --frozen-lockfile && pnpm typecheck && pnpm test && pnpm --filter @restaurante/domain build && pnpm --filter @restaurante/web build
+    publishPath: apps/web/dist
+    envVars:
+      - key: NEXT_PUBLIC_API_BASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        value: https://pacxidxtaykctyqenbat.supabase.co
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+

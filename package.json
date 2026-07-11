@@ -1,0 +1,25 @@
+{
+  "name": "restaurante-rei-do-feijao",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.14.4",
+  "scripts": {
+    "build": "turbo build",
+    "db:generate": "pnpm --filter @restaurante/database db:generate",
+    "db:migrate": "pnpm --filter @restaurante/database db:migrate",
+    "db:seed": "pnpm --filter @restaurante/database db:seed",
+    "db:studio": "pnpm --filter @restaurante/database db:studio",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "test": "turbo test",
+    "typecheck": "turbo typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "26.1.0",
+    "prettier": "3.9.4",
+    "tsx": "4.23.0",
+    "turbo": "2.10.3",
+    "typescript": "6.0.3",
+    "vitest": "2.1.9"
+  }
+}
