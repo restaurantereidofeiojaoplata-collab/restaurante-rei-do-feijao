@@ -40,6 +40,7 @@ export function useAppState() {
   const [employees, setEmployees] = useState<Employee[]>(() => DBService.getEmployees());
   const [cashRegister, setCashRegister] = useState<CashRegister>(() => DBService.getCashRegister());
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [bills, setBills] = useState<any[]>([]);
 
   // Local-only state for routing, dark mode, simulated states, and currentUser
   const [activeView, setActiveView] = useState<ViewType>(() => {
@@ -167,9 +168,87 @@ export function useAppState() {
       setTables(formattedTables);
       setOrders(formattedOrders);
 
-      // Carregar caixa do storage local
-      const localReg = DBService.getCashRegister();
-      setCashRegister(localReg);
+      // 1. Sincronizar Contas a Pagar/Receber do banco
+      try {
+        const billsData = await api.get('/bills');
+        setBills(billsData.map((b: any) => ({
+          id: b.id,
+          title: b.title,
+          amount: b.amountInCents / 100,
+          dueDate: b.dueDate.split('T')[0],
+          status: b.status,
+          type: b.type,
+          category: b.category
+        })));
+      } catch (err) {
+        console.error('Erro ao sincronizar contas a pagar/receber:', err);
+      }
+
+      // 2. Sincronizar Caixa Operacional do banco
+      try {
+        const registers = await api.get('/cash-registers');
+        const defaultRegister = registers[0];
+        if (defaultRegister) {
+          const activeSession = await api.get(`/cash-registers/sessions/active?registerId=${defaultRegister.id}`);
+          if (activeSession) {
+            const movements = await api.get(`/cash-registers/sessions/${activeSession.id}/movements`);
+            
+            const transactions = movements.map((mov: any) => {
+              const op = employees.find(e => e.id === mov.performedById)?.name || 'Operador';
+              
+              let type: 'in' | 'out' = 'in';
+              let category: 'supply' | 'withdrawal' | 'sale' | 'expense' = 'supply';
+              
+              if (mov.type === 'OPENING_BALANCE' || mov.type === 'SUPRIMENTO') {
+                type = 'in';
+                category = 'supply';
+              } else if (mov.type === 'PAYMENT') {
+                type = 'in';
+                category = 'sale';
+              } else if (mov.type === 'SANGRIA') {
+                type = 'out';
+                category = 'withdrawal';
+              } else if (mov.type === 'REFUND') {
+                type = 'out';
+                category = 'expense';
+              }
+              
+              return {
+                id: mov.id,
+                type,
+                amount: mov.amountInCents / 100,
+                description: mov.notes || '',
+                category,
+                timestamp: mov.createdAt,
+                operator: op
+              };
+            });
+            
+            transactions.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+            
+            let currentAmount = activeSession.openingBalanceInCents / 100;
+            for (const m of movements) {
+              if (m.type === 'SUPRIMENTO' || m.type === 'PAYMENT') {
+                currentAmount += m.amountInCents / 100;
+              } else if (m.type === 'SANGRIA' || m.type === 'REFUND') {
+                currentAmount -= m.amountInCents / 100;
+              }
+            }
+            
+            setCashRegister({
+              isOpen: true,
+              openedAt: activeSession.openedAt,
+              initialAmount: activeSession.openingBalanceInCents / 100,
+              currentAmount,
+              transactions
+            });
+          } else {
+            setCashRegister({ isOpen: false, initialAmount: 0, currentAmount: 0, transactions: [] });
+          }
+        }
+      } catch (err) {
+        console.error('Erro ao sincronizar caixa do servidor:', err);
+      }
 
     } catch (err) {
       console.error('[API Sync Error]', err);
@@ -561,7 +640,30 @@ export function useAppState() {
       // 3. Send to kitchen
       await api.post(`/orders/${order.id}/send-to-kitchen`);
 
-      addNotification('Novo Pedido', `Pedido criado e enviado para a cozinha com sucesso.`, 'success');
+      // 4. Auto-pay if paymentStatus is paid
+      if (orderData.paymentStatus === 'paid') {
+        const methodMap: Record<string, string> = {
+          pix: 'PIX',
+          money: 'CASH',
+          card: 'CREDIT_CARD',
+          credit: 'CREDIT_CARD',
+          debit: 'DEBIT_CARD',
+          cash: 'CASH'
+        };
+        const backendMethod = methodMap[orderData.paymentMethod || 'money'] || 'CASH';
+        const provider = backendMethod === 'CASH' ? 'CASH' : 'MANUAL';
+
+        const intent = await api.post('/payments/intents', {
+          orderId: order.id,
+          provider,
+          method: backendMethod,
+          amountInCents: Math.round(orderData.total * 100)
+        });
+
+        await api.post(`/payments/intents/${intent.id}/process`);
+      }
+
+      addNotification('Novo Pedido', `Pedido criado com sucesso.`, 'success');
       await syncData();
       return order;
     } catch (err) {
@@ -657,70 +759,127 @@ export function useAppState() {
   };
 
   // Cash Register Operations
-  const openCashRegister = (initialAmount: number) => {
-    const op = currentUser?.name || 'Operador';
-    const newRegister: CashRegister = {
-      isOpen: true,
-      openedAt: new Date().toISOString(),
-      initialAmount,
-      currentAmount: initialAmount,
-      transactions: [
-        {
-          id: `tx_${Date.now()}`,
-          type: 'in',
-          amount: initialAmount,
-          description: 'Abertura de Caixa',
-          category: 'supply',
-          timestamp: new Date().toISOString(),
-          operator: op
-        }
-      ]
-    };
-    DBService.saveCashRegister(newRegister);
-    setCashRegister(newRegister);
-    addNotification('Caixa Aberto', `Caixa aberto por ${op} com R$ ${initialAmount.toFixed(2)}.`, 'success');
+  const openCashRegister = async (initialAmount: number) => {
+    try {
+      const registers = await api.get('/cash-registers');
+      const defaultRegister = registers[0];
+      if (!defaultRegister) return;
+      
+      await api.post('/cash-registers/sessions/open', {
+        cashRegisterId: defaultRegister.id,
+        openingBalanceInCents: Math.round(initialAmount * 100)
+      });
+      
+      addNotification('Caixa Aberto', `Caixa aberto com sucesso no servidor.`, 'success');
+      await syncData();
+    } catch (err) {
+      console.error('Error opening cash register:', err);
+      addNotification('Erro de Caixa', 'Não foi possível abrir o caixa no servidor.', 'error');
+    }
   };
 
-  const closeCashRegister = () => {
-    const op = currentUser?.name || 'Operador';
-    const closed: CashRegister = {
-      ...cashRegister,
-      isOpen: false,
-      closedAt: new Date().toISOString(),
-    };
-    DBService.saveCashRegister(closed);
-    setCashRegister(closed);
-    addNotification('Caixa Fechado', `Caixa fechado com saldo de R$ ${cashRegister.currentAmount.toFixed(2)}.`, 'info');
+  const closeCashRegister = async () => {
+    try {
+      const registers = await api.get('/cash-registers');
+      const defaultRegister = registers[0];
+      if (!defaultRegister) return;
+      
+      const activeSession = await api.get(`/cash-registers/sessions/active?registerId=${defaultRegister.id}`);
+      if (!activeSession) return;
+      
+      await api.post(`/cash-registers/sessions/${activeSession.id}/close`, {
+        closingBalanceInCents: Math.round(cashRegister.currentAmount * 100),
+        notes: 'Fechamento de turno'
+      });
+      
+      addNotification('Caixa Fechado', `Caixa fechado com sucesso no servidor.`, 'info');
+      await syncData();
+    } catch (err) {
+      console.error('Error closing cash register:', err);
+      addNotification('Erro de Caixa', 'Não foi possível fechar o caixa no servidor.', 'error');
+    }
   };
 
-  const addCashTransaction = (
+  const addCashTransaction = async (
     type: 'in' | 'out',
     amount: number,
     description: string,
     category: CashTransaction['category']
   ) => {
-    const op = currentUser?.name || 'Operador';
-    const tx: CashTransaction = {
-      id: `tx_${Date.now()}`,
-      type,
-      amount,
-      description,
-      category,
-      timestamp: new Date().toISOString(),
-      operator: op
-    };
-
-    const newAmount = type === 'in' ? cashRegister.currentAmount + amount : cashRegister.currentAmount - amount;
-
-    const updated: CashRegister = {
-      ...cashRegister,
-      currentAmount: newAmount,
-      transactions: [tx, ...cashRegister.transactions]
-    };
-
-    DBService.saveCashRegister(updated);
-    setCashRegister(updated);
+    try {
+      const registers = await api.get('/cash-registers');
+      const defaultRegister = registers[0];
+      if (!defaultRegister) return;
+      
+      const activeSession = await api.get(`/cash-registers/sessions/active?registerId=${defaultRegister.id}`);
+      if (!activeSession) return;
+      
+      const path = category === 'supply' ? 'suprimento' : 'sangria';
+      await api.post(`/cash-registers/sessions/${activeSession.id}/${path}`, {
+        amountInCents: Math.round(amount * 100),
+        notes: description
+      });
+      
+      addNotification('Movimentação Registrada', `Lançamento de R$ ${amount.toFixed(2)} registrado com sucesso.`, 'success');
+      await syncData();
+    } catch (err) {
+      console.error('Error adding cash transaction:', err);
+      addNotification('Erro de Caixa', 'Não foi possível registrar a movimentação no servidor.', 'error');
+    }
   };
+
+  // Bills Operations (Contas a Pagar/Receber)
+  const addBill = async (billData: any) => {
+    try {
+      await api.post('/bills', {
+        title: billData.title,
+        amountInCents: Math.round(billData.amount * 100),
+        dueDate: billData.dueDate,
+        type: billData.type,
+        category: billData.category
+      });
+      addNotification('Conta Lançada', `Conta "${billData.title}" adicionada com sucesso.`, 'success');
+      await syncData();
+    } catch (err) {
+      console.error('Error adding bill:', err);
+      addNotification('Erro Financeiro', 'Não foi possível lançar a conta no servidor.', 'error');
+    }
+  };
+
+  const toggleBillStatus = async (billId: string) => {
+    try {
+      const matched = bills.find(b => b.id === billId);
+      if (!matched) return;
+      
+      const nextStatus = matched.status === 'pending' ? 'paid' : 'pending';
+      await api.patch(`/bills/${billId}`, { status: nextStatus });
+      
+      // If paid and cash register is open, auto-register in cash register
+      if (nextStatus === 'paid' && cashRegister.isOpen) {
+        const type = matched.type === 'receivable' ? 'in' : 'out';
+        const category = matched.type === 'receivable' ? 'supply' : 'expense';
+        await addCashTransaction(type, matched.amount, `${matched.type === 'receivable' ? 'Recebimento' : 'Pagamento'}: ${matched.title}`, category);
+      }
+      
+      addNotification('Conta Atualizada', `Status alterado para ${nextStatus === 'paid' ? 'pago' : 'pendente'}.`, 'success');
+      await syncData();
+    } catch (err) {
+      console.error('Error toggling bill status:', err);
+      addNotification('Erro Financeiro', 'Não foi possível atualizar o status da conta no servidor.', 'error');
+    }
+  };
+
+  const deleteBill = async (billId: string) => {
+    try {
+      await api.delete(`/bills/${billId}`);
+      addNotification('Conta Removida', 'Lançamento financeiro deletado com sucesso.', 'info');
+      await syncData();
+    } catch (err) {
+      console.error('Error deleting bill:', err);
+      addNotification('Erro Financeiro', 'Não foi possível remover a conta do servidor.', 'error');
+    }
+  };
+
 
   // Notifications Operations
   const addNotification = (title: string, message: string, type: Notification['type'] = 'info') => {
@@ -798,6 +957,11 @@ export function useAppState() {
     closeCashRegister,
     addCashTransaction,
 
+    bills,
+    addBill,
+    toggleBillStatus,
+    deleteBill,
+
     addNotification,
     markAllNotificationsRead,
     clearNotifications,
@@ -807,3 +971,4 @@ export function useAppState() {
     setPendingDeviceCount
   };
 }
+

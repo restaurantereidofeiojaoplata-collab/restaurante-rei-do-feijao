@@ -70,7 +70,13 @@ export default function App() {
     closeCashRegister,
     addCashTransaction,
 
+    bills,
+    addBill,
+    toggleBillStatus,
+    deleteBill,
+
     addNotification,
+
     markAllNotificationsRead,
     clearNotifications,
     resetAllData,
@@ -394,8 +400,14 @@ export default function App() {
                       onOpenCashRegister={openCashRegister}
                       onCloseCashRegister={closeCashRegister}
                       onAddCashTransaction={addCashTransaction}
+                      bills={bills}
+                      onAddBill={addBill}
+                      onToggleBillStatus={toggleBillStatus}
+                      onDeleteBill={deleteBill}
+                      orders={orders}
                     />
                   )}
+
 
                   {activeView === 'employees' && (
                     <EmployeesView

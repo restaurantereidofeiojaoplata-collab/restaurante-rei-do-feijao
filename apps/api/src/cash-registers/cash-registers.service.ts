@@ -44,11 +44,26 @@ export class CashRegistersService {
     if (branchId) {
       conditions.push(eq(cashRegisters.branchId, branchId));
     }
-    return db
+    const list = await db
       .select()
       .from(cashRegisters)
       .where(and(...conditions));
+
+    if (list.length === 0 && branchId) {
+      const [newReg] = await db
+        .insert(cashRegisters)
+        .values({
+          restaurantId,
+          branchId,
+          name: "Caixa Principal",
+          isActive: true
+        })
+        .returning();
+      return [newReg];
+    }
+    return list;
   }
+
 
   async getActiveSession(restaurantId: string, branchId: string, registerId?: string) {
     const conditions = [
@@ -216,4 +231,18 @@ export class CashRegistersService {
 
     return closedSession;
   }
+
+  async getSessionMovements(restaurantId: string, sessionId: string) {
+    return db
+      .select()
+      .from(cashMovements)
+      .where(
+        and(
+          eq(cashMovements.sessionId, sessionId),
+          eq(cashMovements.restaurantId, restaurantId)
+        )
+      )
+      .orderBy(cashMovements.createdAt);
+  }
 }
+

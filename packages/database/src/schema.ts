@@ -710,3 +710,30 @@ export const deviceSessions = pgTable(
       .on(table.userId, table.deviceFingerprint)
   ]
 );
+
+// Bills Payable & Receivable (Contas a Pagar/Receber)
+export const bills = pgTable(
+  "bills",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    restaurantId: uuid("restaurant_id")
+      .references(() => restaurants.id, { onDelete: "restrict" })
+      .notNull(),
+    title: text("title").notNull(),
+    amountInCents: integer("amount_in_cents").notNull(),
+    dueDate: timestamp("due_date", { withTimezone: true }).notNull(),
+    status: text("status").default("pending").notNull(), // 'pending', 'paid'
+    type: text("type").notNull(), // 'payable' (a pagar), 'receivable' (a receber)
+    category: text("category").notNull(), // 'Fornecedor', 'Aluguel', etc.
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull()
+  },
+  (table) => [
+    index("bills_restaurant_id_idx").on(table.restaurantId)
+  ]
+);
+

@@ -110,4 +110,14 @@ export class CashRegistersController {
       body
     );
   }
+
+  @Get("sessions/:id/movements")
+  @RequirePermissions("cash-register:manage")
+  async getSessionMovements(
+    @CurrentSession() session: SessionType,
+    @Param("id") id: string
+  ) {
+    return this.cashRegistersService.getSessionMovements(session.restaurantId, id);
+  }
 }
+

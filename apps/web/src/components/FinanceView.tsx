@@ -22,13 +22,23 @@ interface FinanceViewProps {
   onOpenCashRegister: (amount: number) => void;
   onCloseCashRegister: () => void;
   onAddCashTransaction: (type: 'in' | 'out', amount: number, desc: string, cat: any) => void;
+  bills: any[];
+  onAddBill: (bill: any) => void;
+  onToggleBillStatus: (id: string) => void;
+  onDeleteBill: (id: string) => void;
+  orders: any[];
 }
 
 export function FinanceView({
   cashRegister,
   onOpenCashRegister,
   onCloseCashRegister,
-  onAddCashTransaction
+  onAddCashTransaction,
+  bills = [],
+  onAddBill,
+  onToggleBillStatus,
+  onDeleteBill,
+  orders = []
 }: FinanceViewProps) {
   // Sub-tabs: 'cashflow' | 'bills' | 'reports'
   const [activeSubTab, setActiveSubTab] = useState<'cashflow' | 'bills' | 'reports'>('cashflow');
@@ -43,8 +53,7 @@ export function FinanceView({
   const [txDesc, setTxDesc] = useState<string>('');
   const [txCategory, setTxCategory] = useState<'supply' | 'withdrawal' | 'expense'>('supply');
 
-  // Bills payable and receivable state
-  const [billsList, setBillsList] = useState<{ id: string; title: string; amount: number; dueDate: string; status: string; type: string; category: string }[]>([]);
+  // Bills UI modal state
   const [showAddBillModal, setShowAddBillModal] = useState(false);
   const [billTitle, setBillTitle] = useState('');
   const [billAmount, setBillAmount] = useState(100);
@@ -53,10 +62,10 @@ export function FinanceView({
   const [billCategory, setBillCategory] = useState('Geral');
 
   // Calculations
-  const salesCount = cashRegister.transactions.filter(t => t.category === 'sale').length;
-  const totalSales = cashRegister.transactions
-    .filter(t => t.category === 'sale')
-    .reduce((sum, t) => sum + t.amount, 0);
+  const salesCount = orders.filter(o => o.paymentStatus === 'paid').length;
+  const totalSales = orders
+    .filter(o => o.paymentStatus === 'paid')
+    .reduce((sum, o) => sum + o.total, 0);
 
   const totalSupplies = cashRegister.transactions
     .filter(t => t.category === 'supply')
@@ -65,6 +74,21 @@ export function FinanceView({
   const totalWithdrawals = cashRegister.transactions
     .filter(t => t.type === 'out')
     .reduce((sum, t) => sum + t.amount, 0);
+
+  // Calc actual totals by method from cash transactions
+  const totalPix = cashRegister.transactions
+    .filter(t => t.category === 'sale' && t.description.toLowerCase().includes('pix'))
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const totalCard = cashRegister.transactions
+    .filter(t => t.category === 'sale' && (t.description.toLowerCase().includes('card') || t.description.toLowerCase().includes('credit') || t.description.toLowerCase().includes('debit')))
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const totalCashSales = cashRegister.transactions
+    .filter(t => t.category === 'sale' && !t.description.toLowerCase().includes('pix') && !t.description.toLowerCase().includes('card') && !t.description.toLowerCase().includes('credit') && !t.description.toLowerCase().includes('debit'))
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const cashAmount = (cashRegister.isOpen ? cashRegister.initialAmount : 0) + totalSupplies + totalCashSales - totalWithdrawals;
 
   const handleOpenRegister = (e: FormEvent) => {
     e.preventDefault();
@@ -91,47 +115,26 @@ export function FinanceView({
     e.preventDefault();
     if (!billTitle.trim() || billAmount <= 0) return;
 
-    const newBill = {
-      id: `b_${Date.now()}`,
+    onAddBill({
       title: billTitle.trim(),
       amount: Number(billAmount),
       dueDate: billDueDate,
-      status: 'pending',
       type: billType,
       category: billCategory
-    };
-
-    setBillsList([...billsList, newBill]);
+    });
     setBillTitle('');
     setBillAmount(100);
     setShowAddBillModal(false);
   };
 
   const handleToggleBillStatus = (billId: string) => {
-    const updated = billsList.map(b => {
-      if (b.id === billId) {
-        const nextStatus = b.status === 'pending' ? 'paid' : 'pending';
-        
-        // Auto-register in cash register if open
-        if (cashRegister.isOpen) {
-          if (nextStatus === 'paid') {
-            if (b.type === 'receivable') {
-              onAddCashTransaction('in', b.amount, `Recebimento: ${b.title}`, 'sale');
-            } else {
-              onAddCashTransaction('out', b.amount, `Pagamento: ${b.title}`, 'expense');
-            }
-          }
-        }
-        return { ...b, status: nextStatus };
-      }
-      return b;
-    });
-    setBillsList(updated);
+    onToggleBillStatus(billId);
   };
 
   const handleDeleteBill = (billId: string) => {
-    setBillsList(billsList.filter(b => b.id !== billId));
+    onDeleteBill(billId);
   };
+
 
   // CSV Exporter for Transactions
   const handleExportCSV = () => {
@@ -286,15 +289,15 @@ export function FinanceView({
             <div className="bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm space-y-4 lg:col-span-2 flex flex-col justify-between">
               <div>
                 <h3 className="font-extrabold text-neutral-900 text-sm">Resumo da Conciliação de Vendas</h3>
-                <p className="text-xs text-neutral-600 font-bold">Conciliação simulada agregada por canais de pagamento</p>
+                <p className="text-xs text-neutral-600 font-bold">Conciliação em tempo real agregada por canais de pagamento</p>
               </div>
 
               {/* Conciliation cards */}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 my-3">
                 {[
-                  { label: 'Total Dinheiro', value: totalSales * 0.4 + (cashRegister.isOpen ? cashRegister.initialAmount : 0) - totalWithdrawals, icon: DollarSign, color: 'text-emerald-800 bg-emerald-100 border border-emerald-250 shadow-sm' },
-                  { label: 'Compensado PIX', value: totalSales * 0.35, icon: FileText, color: 'text-teal-850 bg-teal-100 border border-teal-250 shadow-sm' },
-                  { label: 'Cartões SmartPOS', value: totalSales * 0.25, icon: Layers, color: 'text-blue-850 bg-blue-100 border border-blue-250 shadow-sm' }
+                  { label: 'Total Dinheiro', value: cashAmount, icon: DollarSign, color: 'text-emerald-800 bg-emerald-100 border border-emerald-250 shadow-sm' },
+                  { label: 'Compensado PIX', value: totalPix, icon: FileText, color: 'text-teal-850 bg-teal-100 border border-teal-250 shadow-sm' },
+                  { label: 'Cartões SmartPOS', value: totalCard, icon: Layers, color: 'text-blue-850 bg-blue-100 border border-blue-250 shadow-sm' }
                 ].map((col, idx) => (
                   <div key={idx} className="p-3 border border-neutral-200 rounded-2xl space-y-1.5">
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${col.color}`}>
@@ -479,7 +482,7 @@ export function FinanceView({
               </div>
 
               <div className="space-y-3">
-                {billsList.filter(b => b.type === 'payable').map(bill => (
+                {bills.filter(b => b.type === 'payable').map(bill => (
                   <div key={bill.id} className="p-3 border border-neutral-150 hover:border-neutral-350 rounded-xl flex items-center justify-between text-xs hover:bg-neutral-50/20 transition">
                     <div className="space-y-1">
                       <h4 className="font-bold text-neutral-900">{bill.title}</h4>
@@ -520,7 +523,7 @@ export function FinanceView({
               </div>
 
               <div className="space-y-3">
-                {billsList.filter(b => b.type === 'receivable').map(bill => (
+                {bills.filter(b => b.type === 'receivable').map(bill => (
                   <div key={bill.id} className="p-3 border border-neutral-150 hover:border-neutral-350 rounded-xl flex items-center justify-between text-xs hover:bg-neutral-50/20 transition">
                     <div className="space-y-1">
                       <h4 className="font-bold text-neutral-900">{bill.title}</h4>

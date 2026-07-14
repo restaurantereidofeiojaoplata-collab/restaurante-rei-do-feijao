@@ -13,6 +13,8 @@ import { PaymentsModule } from "./payments/payments.module.js";
 import { WebsocketsModule } from "./websockets/websockets.module.js";
 import { MailModule } from "./mail/mail.module.js";
 import { DeviceSessionsModule } from "./device-sessions/device-sessions.module.js";
+import { BillsModule } from "./bills/bills.module.js";
+
 
 @Module({
   controllers: [HealthController],
@@ -28,7 +30,8 @@ import { DeviceSessionsModule } from "./device-sessions/device-sessions.module.j
     PaymentsModule,
     WebsocketsModule,
     MailModule,
-    DeviceSessionsModule
+    DeviceSessionsModule,
+    BillsModule
   ],
   providers: [HealthService]
 })
