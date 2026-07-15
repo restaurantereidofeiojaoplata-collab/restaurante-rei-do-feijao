@@ -9,7 +9,8 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
-  varchar
+  varchar,
+  doublePrecision
 } from "drizzle-orm/pg-core";
 
 export const userStatusEnum = pgEnum("user_status", [
@@ -367,6 +368,34 @@ export const paymentIntents = pgTable(
   ]
 );
 
+// Card Machines / POS Terminals
+export const cardMachines = pgTable(
+  "card_machines",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    restaurantId: uuid("restaurant_id")
+      .references(() => restaurants.id, { onDelete: "restrict" })
+      .notNull(),
+    name: text("name").notNull(),
+    model: text("model").notNull(),
+    serialNumber: varchar("serial_number", { length: 120 }).notNull(),
+    creditFee: doublePrecision("credit_fee").default(2.5).notNull(),
+    debitFee: doublePrecision("debit_fee").default(1.5).notNull(),
+    pixFee: doublePrecision("pix_fee").default(0.0).notNull(),
+    isActive: boolean("is_active").default(true).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull()
+  },
+  (table) => [
+    index("card_machines_restaurant_id_idx").on(table.restaurantId),
+    uniqueIndex("card_machines_serial_number_unique").on(table.serialNumber)
+  ]
+);
+
 export const paymentTransactions = pgTable(
   "payment_transactions",
   {
@@ -377,6 +406,8 @@ export const paymentTransactions = pgTable(
     paymentIntentId: uuid("payment_intent_id")
       .references(() => paymentIntents.id, { onDelete: "restrict" })
       .notNull(),
+    cardMachineId: uuid("card_machine_id")
+      .references(() => cardMachines.id, { onDelete: "set null" }),
     provider: paymentProviderEnum("provider").notNull(),
     providerTransactionId: varchar("provider_transaction_id", { length: 180 }),
     status: paymentStatusEnum("status").notNull(),
@@ -388,12 +419,14 @@ export const paymentTransactions = pgTable(
   (table) => [
     index("payment_transactions_restaurant_id_idx").on(table.restaurantId),
     index("payment_transactions_intent_id_idx").on(table.paymentIntentId),
+    index("payment_transactions_card_machine_id_idx").on(table.cardMachineId),
     uniqueIndex("payment_transactions_provider_reference_unique").on(
       table.provider,
       table.providerTransactionId
     )
   ]
 );
+
 
 export const idempotencyKeys = pgTable(
   "idempotency_keys",

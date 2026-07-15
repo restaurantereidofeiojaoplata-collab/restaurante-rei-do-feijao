@@ -134,10 +134,83 @@ export function SettingsView({ currentUser, onUpdateProfile, onResetData, onOpen
     }
   };
 
+  // Card Machines states
+  const [machines, setMachines] = useState<any[]>([]);
+  const [machinesLoading, setMachinesLoading] = useState(false);
+  const [savingMachine, setSavingMachine] = useState(false);
+  const [mName, setMName] = useState('');
+  const [mModel, setMModel] = useState('');
+  const [mSerial, setMSerial] = useState('');
+  const [mCreditFee, setMCreditFee] = useState<number>(2.5);
+  const [mDebitFee, setMDebitFee] = useState<number>(1.5);
+  const [mPixFee, setMPixFee] = useState<number>(0.0);
 
+  const fetchMachines = async () => {
+    setMachinesLoading(true);
+    try {
+      const data = await api.get('/card-machines');
+      if (Array.isArray(data)) {
+        setMachines(data);
+      }
+    } catch (e) {
+      console.error('Erro ao buscar maquininhas:', e);
+    } finally {
+      setMachinesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'integrations') {
+      fetchMachines();
+    }
+  }, [activeTab]);
+
+  const handleCreateMachine = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mName || !mModel || !mSerial) {
+      alert('Preencha todos os campos obrigatórios.');
+      return;
+    }
+    setSavingMachine(true);
+    try {
+      await api.post('/card-machines', {
+        name: mName,
+        model: mModel,
+        serialNumber: mSerial,
+        creditFee: mCreditFee,
+        debitFee: mDebitFee,
+        pixFee: mPixFee
+      });
+      alert('Maquininha registrada com sucesso no banco de dados!');
+      // Reset form
+      setMName('');
+      setMModel('');
+      setMSerial('');
+      setMCreditFee(2.5);
+      setMDebitFee(1.5);
+      setMPixFee(0.0);
+      fetchMachines();
+    } catch (e) {
+      console.error(e);
+      alert('Erro ao registrar a maquininha. Verifique se o S/N já está cadastrado.');
+    } finally {
+      setSavingMachine(false);
+    }
+  };
+
+  const handleDeleteMachine = async (id: string) => {
+    if (!confirm('Deseja realmente remover esta maquininha?')) return;
+    try {
+      await api.delete(`/card-machines/${id}`);
+      fetchMachines();
+    } catch (e) {
+      alert('Erro ao excluir maquininha.');
+    }
+  };
 
 
   // Device management dashboard states
+
   const [deviceSessions, setDeviceSessions] = useState<any[]>([]);
   const [deviceLoading, setDeviceLoading] = useState(false);
   const [editingDevice, setEditingDevice] = useState<any | null>(null);
@@ -1090,68 +1163,155 @@ export function SettingsView({ currentUser, onUpdateProfile, onResetData, onOpen
                   </p>
                 </div>
 
-                {/* 3. Card Processing Fees Card */}
-                <div className="bg-white border border-neutral-200 rounded-3xl p-6 shadow-sm space-y-4 mt-6">
+                {/* 3. Card Machines Management Section */}
+                <div className="bg-white border border-neutral-200 rounded-3xl p-6 shadow-sm space-y-6 mt-6">
                   <div>
-                    <h4 className="font-extrabold text-neutral-900 text-xs uppercase tracking-wider text-emerald-800">Taxas da Máquina de Cartão & Pagamentos</h4>
-                    <p className="text-[10px] text-neutral-500 font-bold">Configure as taxas cobradas pelas adquirentes para descontar dos relatórios de faturamento líquido.</p>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-neutral-600">Cartão de Crédito (%)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="100"
-                        value={creditCardFee}
-                        onChange={(e) => setCreditCardFee(Math.max(0, Number(e.target.value)))}
-                        className="w-full bg-neutral-50 border border-neutral-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500 text-neutral-900 font-bold"
-                        placeholder="2.50"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-neutral-600">Cartão de Débito (%)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="100"
-                        value={debitCardFee}
-                        onChange={(e) => setDebitCardFee(Math.max(0, Number(e.target.value)))}
-                        className="w-full bg-neutral-50 border border-neutral-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500 text-neutral-900 font-bold"
-                        placeholder="1.50"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-black uppercase text-neutral-600">Taxa PIX (%)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        max="100"
-                        value={pixFee}
-                        onChange={(e) => setPixFee(Math.max(0, Number(e.target.value)))}
-                        className="w-full bg-neutral-50 border border-neutral-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500 text-neutral-900 font-bold"
-                        placeholder="0.00"
-                      />
-                    </div>
+                    <h4 className="font-extrabold text-neutral-900 text-xs uppercase tracking-wider text-emerald-800">Gerenciador de Maquininhas de Cartão</h4>
+                    <p className="text-[10px] text-neutral-500 font-bold">Cadastre múltiplos terminais físicos e defina as taxas de transação individuais por maquininha.</p>
                   </div>
 
-                  <div className="flex justify-end pt-2">
-                    <button
-                      type="button"
-                      onClick={handleSaveFeesToDb}
-                      disabled={savingFees}
-                      className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-neutral-950 font-black rounded-xl border border-emerald-550 transition flex items-center gap-2 shadow-lg shadow-emerald-500/10 text-center"
-                    >
-                      {savingFees ? 'Salvando no Banco...' : 'Salvar Taxas no Banco de Dados'}
-                    </button>
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Form to add a new card machine */}
+                    <form onSubmit={handleCreateMachine} className="bg-neutral-50/50 p-5 rounded-2xl border border-neutral-200 space-y-4 lg:col-span-1">
+                      <span className="text-[10px] font-black uppercase text-emerald-950 block border-b border-neutral-200 pb-2">Registrar Novo Terminal</span>
+
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black uppercase text-neutral-600">Apelido/Nome *</label>
+                        <input
+                          type="text"
+                          required
+                          value={mName}
+                          onChange={(e) => setMName(e.target.value)}
+                          placeholder="Ex: Maquininha Balcão"
+                          className="w-full bg-white border border-neutral-200 rounded-xl p-2.5 text-neutral-900 font-bold focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black uppercase text-neutral-600">Modelo *</label>
+                        <input
+                          type="text"
+                          required
+                          value={mModel}
+                          onChange={(e) => setMModel(e.target.value)}
+                          placeholder="Ex: Moderninha Pro 2"
+                          className="w-full bg-white border border-neutral-200 rounded-xl p-2.5 text-neutral-900 font-bold focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[9px] font-black uppercase text-neutral-600">Número de Série (S/N) *</label>
+                        <input
+                          type="text"
+                          required
+                          value={mSerial}
+                          onChange={(e) => setMSerial(e.target.value)}
+                          placeholder="Ex: 6P201153"
+                          className="w-full bg-white border border-neutral-200 rounded-xl p-2.5 text-neutral-900 font-bold focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-1">
+                          <label className="text-[8px] font-black uppercase text-neutral-600 block truncate">Crédito (%)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            value={mCreditFee}
+                            onChange={(e) => setMCreditFee(Math.max(0, Number(e.target.value)))}
+                            className="w-full bg-white border border-neutral-200 rounded-xl p-2 text-neutral-900 font-bold text-center"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[8px] font-black uppercase text-neutral-600 block truncate">Débito (%)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            value={mDebitFee}
+                            onChange={(e) => setMDebitFee(Math.max(0, Number(e.target.value)))}
+                            className="w-full bg-white border border-neutral-200 rounded-xl p-2 text-neutral-900 font-bold text-center"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[8px] font-black uppercase text-neutral-600 block truncate">PIX (%)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            max="100"
+                            value={mPixFee}
+                            onChange={(e) => setMPixFee(Math.max(0, Number(e.target.value)))}
+                            className="w-full bg-white border border-neutral-200 rounded-xl p-2 text-neutral-900 font-bold text-center"
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={savingMachine}
+                        className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-neutral-950 font-black rounded-xl border border-emerald-550 transition text-center text-xs shadow-md"
+                      >
+                        {savingMachine ? 'Cadastrando...' : 'Cadastrar Maquininha'}
+                      </button>
+                    </form>
+
+                    {/* Table listing registered terminals */}
+                    <div className="lg:col-span-2 space-y-4">
+                      <span className="text-[10px] font-black uppercase text-neutral-600 block border-b border-neutral-200 pb-2">Maquininhas Registradas no Banco</span>
+                      
+                      {machinesLoading ? (
+                        <div className="text-center py-10 text-neutral-500 font-bold text-[10px]">Carregando maquininhas...</div>
+                      ) : machines.length === 0 ? (
+                        <div className="text-center py-10 bg-neutral-50 border border-dashed border-neutral-250 rounded-2xl text-neutral-500 font-bold text-[10px]">
+                          Nenhuma maquininha cadastrada no banco de dados. Cadastre uma ao lado para iniciar.
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto border border-neutral-200 rounded-2xl bg-white">
+                          <table className="w-full text-left border-collapse text-[10px]">
+                            <thead>
+                              <tr className="bg-neutral-50 border-b border-neutral-200">
+                                <th className="p-3 font-black text-neutral-700 uppercase">Apelido / Modelo</th>
+                                <th className="p-3 font-black text-neutral-700 uppercase">S/N</th>
+                                <th className="p-3 font-black text-neutral-700 uppercase text-center">Taxas (C / D / P)</th>
+                                <th className="p-3 font-black text-neutral-700 uppercase text-center">Ações</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {machines.map((mac) => (
+                                <tr key={mac.id} className="border-b border-neutral-100 hover:bg-neutral-50/50">
+                                  <td className="p-3 font-bold">
+                                    <div className="text-neutral-900 font-black">{mac.name}</div>
+                                    <div className="text-neutral-500 text-[9px] font-bold">{mac.model}</div>
+                                  </td>
+                                  <td className="p-3 font-mono font-black text-neutral-800">{mac.serialNumber}</td>
+                                  <td className="p-3 font-black text-center text-emerald-800">
+                                    {mac.creditFee.toFixed(2)}% / {mac.debitFee.toFixed(2)}% / {mac.pixFee.toFixed(2)}%
+                                  </td>
+                                  <td className="p-3 text-center">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleDeleteMachine(mac.id)}
+                                      className="py-1 px-2.5 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-800 rounded-lg font-black transition text-[9px]"
+                                    >
+                                      Remover
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
+
 
               </div>
             </div>

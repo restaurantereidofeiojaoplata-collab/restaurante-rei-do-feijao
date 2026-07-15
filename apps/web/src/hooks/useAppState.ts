@@ -671,8 +671,9 @@ export function useAppState() {
           amountInCents: Math.round(orderData.total * 100)
         });
 
-        await api.post(`/payments/intents/${intent.id}/process`);
+        await api.post(`/payments/intents/${intent.id}/process`, { cardMachineId: orderData.cardMachineId });
       }
+
 
       addNotification('Novo Pedido', `Pedido criado com sucesso.`, 'success');
       await syncData();
@@ -708,8 +709,7 @@ export function useAppState() {
     }
   };
 
-  // Pay an order directly (e.g. from POS or Table Checkout modal)
-  const payOrder = async (orderId: string, method: Order['paymentMethod'], discount: number = 0) => {
+  const payOrder = async (orderId: string, method: Order['paymentMethod'], discount: number = 0, cardMachineId?: string) => {
     try {
       const order = orders.find(o => o.id === orderId);
       if (!order) return;
@@ -735,7 +735,7 @@ export function useAppState() {
       });
 
       // 2. Process Intent
-      await api.post(`/payments/intents/${intent.id}/process`);
+      await api.post(`/payments/intents/${intent.id}/process`, { cardMachineId });
 
       addNotification('Pagamento Confirmado', `Pedido pago via ${method?.toUpperCase()}.`, 'success');
       await syncData();
@@ -744,6 +744,7 @@ export function useAppState() {
       addNotification('Erro no Pagamento', 'Não foi possível processar o pagamento no servidor.', 'error');
     }
   };
+
 
   // Employees Operations
   const addEmployee = (emp: Omit<Employee, 'id'>) => {

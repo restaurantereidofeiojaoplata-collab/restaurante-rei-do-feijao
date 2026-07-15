@@ -21,6 +21,13 @@ export class PaymentsController {
     return [];
   }
 
+  @Get("transactions")
+  @RequirePermissions("payments:manage")
+  async listTransactions(@CurrentSession() session: SessionType) {
+    return this.paymentsService.listTransactions(session.restaurantId);
+  }
+
+
   @Post("intents")
   @UseGuards(SessionGuard)
   @RequirePermissions("payments:manage")
@@ -36,7 +43,8 @@ export class PaymentsController {
   @RequirePermissions("payments:manage")
   async processIntent(
     @CurrentSession() session: SessionType,
-    @Param("id") id: string
+    @Param("id") id: string,
+    @Body() body?: { cardMachineId?: string }
   ) {
     if (!session.branchId) {
       throw new BadRequestException("User has no branch associated.");
@@ -45,7 +53,9 @@ export class PaymentsController {
       session.restaurantId,
       session.branchId,
       session.userId,
-      id
+      id,
+      body?.cardMachineId
     );
   }
+
 }

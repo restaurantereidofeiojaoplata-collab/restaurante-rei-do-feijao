@@ -39,7 +39,9 @@ export interface Order {
   paymentStatus: 'pending' | 'processing' | 'paid' | 'failed' | 'refunded';
   createdAt: string;
   customerName?: string;
+  cardMachineId?: string;
 }
+
 
 export interface Comanda {
   id: string;

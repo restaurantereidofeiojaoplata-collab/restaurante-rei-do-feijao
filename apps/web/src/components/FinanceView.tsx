@@ -1,4 +1,5 @@
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
+import { api } from '../services/api';
 import {
   DollarSign,
   TrendingUp,
@@ -16,6 +17,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CashRegister, CashTransaction } from '../types';
+
 
 interface FinanceViewProps {
   cashRegister: CashRegister;
@@ -42,6 +44,28 @@ export function FinanceView({
 }: FinanceViewProps) {
   // Sub-tabs: 'cashflow' | 'bills' | 'reports'
   const [activeSubTab, setActiveSubTab] = useState<'cashflow' | 'bills' | 'reports'>('cashflow');
+
+  const [dbTransactions, setDbTransactions] = useState<any[]>([]);
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
+
+  const fetchTransactions = async () => {
+    setTransactionsLoading(true);
+    try {
+      const data = await api.get('/payments/transactions');
+      if (Array.isArray(data)) {
+        setDbTransactions(data);
+      }
+    } catch (e) {
+      console.error('Erro ao buscar transações:', e);
+    } finally {
+      setTransactionsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [activeSubTab]);
+
 
   // Opening drawer initial amount state
   const [openingAmount, setOpeningAmount] = useState<number>(0);
@@ -98,15 +122,34 @@ export function FinanceView({
     .filter(t => t.category === 'sale' && !t.description.toLowerCase().includes('pix') && !t.description.toLowerCase().includes('card') && !t.description.toLowerCase().includes('cartão') && !t.description.toLowerCase().includes('credit') && !t.description.toLowerCase().includes('crédito') && !t.description.toLowerCase().includes('debit') && !t.description.toLowerCase().includes('débito'))
     .reduce((sum, t) => sum + t.amount, 0);
 
-  // Load configured fees percents from settings
-  const creditFeePercent = parseFloat(localStorage.getItem('gourmet_settings_credit_fee') || '2.5');
-  const debitFeePercent = parseFloat(localStorage.getItem('gourmet_settings_debit_fee') || '1.5');
-  const pixFeePercent = parseFloat(localStorage.getItem('gourmet_settings_pix_fee') || '0');
+  // Calcule dynamic card processing fees from transactions list
+  const totalProcessingFees = dbTransactions
+    .filter(tx => tx.status === 'APPROVED')
+    .reduce((sum, tx) => {
+      const amount = tx.amountInCents / 100;
+      const isPix = tx.provider === 'PIX' || tx.providerTransactionId?.toLowerCase().includes('pix') || tx.rawPayload?.provider === 'PIX';
+      const isCredit = tx.rawPayload?.method === 'CREDIT' || tx.providerTransactionId?.toLowerCase().includes('credit') || tx.rawPayload?.provider === 'CREDIT';
 
-  const creditFees = (totalCreditCard + totalGenericCard * 0.5) * (creditFeePercent / 100);
-  const debitFees = (totalDebitCard + totalGenericCard * 0.5) * (debitFeePercent / 100);
-  const pixFees = totalPix * (pixFeePercent / 100);
-  const totalProcessingFees = creditFees + debitFees + pixFees;
+      let feePercent = 0;
+      if (tx.cardMachineId && tx.cardMachineName) {
+        // Use joined card machine fees
+        if (isPix) feePercent = tx.pixFee;
+        else if (isCredit) feePercent = tx.creditFee;
+        else feePercent = tx.debitFee;
+      } else {
+        // Fallback to global setting percents
+        const creditFeePercent = parseFloat(localStorage.getItem('gourmet_settings_credit_fee') || '2.5');
+        const debitFeePercent = parseFloat(localStorage.getItem('gourmet_settings_debit_fee') || '1.5');
+        const pixFeePercent = parseFloat(localStorage.getItem('gourmet_settings_pix_fee') || '0');
+
+        if (isPix) feePercent = pixFeePercent;
+        else if (isCredit) feePercent = creditFeePercent;
+        else feePercent = debitFeePercent;
+      }
+
+      return sum + (amount * (feePercent / 100));
+    }, 0);
+
 
   const cashAmount = (cashRegister.isOpen ? cashRegister.initialAmount : 0) + totalSupplies + totalCashSales - totalWithdrawals;
 
@@ -768,6 +811,108 @@ export function FinanceView({
                       <div className="bg-emerald-600 h-full rounded-full transition-all duration-500" style={{ width: `${pctTarget}%` }}></div>
                     </div>
                   </div>
+                </div>
+
+                {/* Card Machines Detailed Transaction Log */}
+                <div className="bg-white border border-neutral-200 rounded-3xl p-6 shadow-sm space-y-4 mt-6">
+                  <div>
+                    <h4 className="font-extrabold text-neutral-900 text-xs uppercase tracking-wider text-emerald-800">Histórico de Transações do Caixa (Cartão & Pix)</h4>
+                    <p className="text-[10px] text-neutral-500 font-bold">Listagem completa e detalhada de pagamentos processados por maquininhas vinculadas ao banco de dados.</p>
+                  </div>
+
+                  {transactionsLoading ? (
+                    <div className="text-center py-8 text-neutral-500 font-bold text-[10px]">Buscando transações no banco...</div>
+                  ) : dbTransactions.length === 0 ? (
+                    <div className="text-center py-8 bg-neutral-50 border border-dashed border-neutral-250 rounded-2xl text-neutral-500 font-bold text-[10px]">
+                      Nenhuma transação de cartão ou Pix registrada no banco de dados.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto border border-neutral-200 rounded-2xl bg-white">
+                      <table className="w-full text-left border-collapse text-[10px]">
+                        <thead>
+                          <tr className="bg-neutral-50 border-b border-neutral-200">
+                            <th className="p-3 font-black text-neutral-700 uppercase">Data/Hora</th>
+                            <th className="p-3 font-black text-neutral-700 uppercase">Maquininha Utilizada</th>
+                            <th className="p-3 font-black text-neutral-700 uppercase">Método</th>
+                            <th className="p-3 font-black text-neutral-700 uppercase">Código Ref.</th>
+                            <th className="p-3 font-black text-neutral-700 uppercase text-right">Valor Bruto</th>
+                            <th className="p-3 font-black text-neutral-700 uppercase text-center">Taxa Aplicada</th>
+                            <th className="p-3 font-black text-neutral-700 uppercase text-right">Líquido Recebido</th>
+                            <th className="p-3 font-black text-neutral-700 uppercase text-center">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dbTransactions.map((tx) => {
+                            const amount = tx.amountInCents / 100;
+                            const isPix = tx.provider === 'PIX' || tx.providerTransactionId?.toLowerCase().includes('pix') || tx.rawPayload?.provider === 'PIX';
+                            const isCredit = tx.rawPayload?.method === 'CREDIT' || tx.providerTransactionId?.toLowerCase().includes('credit') || tx.rawPayload?.provider === 'CREDIT';
+
+                            let feePercent = 0;
+                            if (tx.cardMachineId && tx.cardMachineName) {
+                              if (isPix) feePercent = tx.pixFee;
+                              else if (isCredit) feePercent = tx.creditFee;
+                              else feePercent = tx.debitFee;
+                            } else {
+                              const creditFeePercent = parseFloat(localStorage.getItem('gourmet_settings_credit_fee') || '2.5');
+                              const debitFeePercent = parseFloat(localStorage.getItem('gourmet_settings_debit_fee') || '1.5');
+                              const pixFeePercent = parseFloat(localStorage.getItem('gourmet_settings_pix_fee') || '0');
+
+                              if (isPix) feePercent = pixFeePercent;
+                              else if (isCredit) feePercent = creditFeePercent;
+                              else feePercent = debitFeePercent;
+                            }
+
+                            const feeValue = amount * (feePercent / 100);
+                            const netValue = amount - feeValue;
+
+                            return (
+                              <tr key={tx.id} className="border-b border-neutral-100 hover:bg-neutral-50/50">
+                                <td className="p-3 font-bold text-neutral-500 whitespace-nowrap">
+                                  {new Date(tx.occurredAt).toLocaleDateString('pt-BR')} às {new Date(tx.occurredAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                </td>
+                                <td className="p-3">
+                                  {tx.cardMachineName ? (
+                                    <div>
+                                      <span className="font-black text-neutral-900">{tx.cardMachineName}</span>
+                                      <span className="text-[9px] text-neutral-500 block">Mod: {tx.cardMachineModel} (S/N: {tx.cardMachineSerial})</span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-neutral-400 italic">Terminal Manual/Config. Geral</span>
+                                  )}
+                                </td>
+                                <td className="p-3">
+                                  <span className="font-extrabold text-neutral-800">{isPix ? 'PIX' : isCredit ? 'CRÉDITO' : 'DÉBITO'}</span>
+                                </td>
+                                <td className="p-3 font-mono text-neutral-600 truncate max-w-[120px]" title={tx.providerTransactionId}>
+                                  {tx.providerTransactionId || '-'}
+                                </td>
+                                <td className="p-3 font-black text-right text-neutral-900">
+                                  R$ {amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </td>
+                                <td className="p-3 text-center whitespace-nowrap">
+                                  <span className="font-bold text-amber-800 bg-amber-50 border border-amber-250 px-2 py-0.5 rounded-lg font-mono">
+                                    {feePercent.toFixed(2)}% (R$ {feeValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
+                                  </span>
+                                </td>
+                                <td className="p-3 font-black text-right text-emerald-950">
+                                  R$ {netValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </td>
+                                <td className="p-3 text-center">
+                                  <span className={`px-2 py-0.5 rounded-full text-[9px] font-black border uppercase tracking-wider ${
+                                    tx.status === 'APPROVED'
+                                      ? 'bg-emerald-100 border-emerald-250 text-emerald-800'
+                                      : 'bg-rose-100 border-rose-250 text-rose-800'
+                                  }`}>
+                                    {tx.status === 'APPROVED' ? 'Aprovado' : 'Recusado'}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
             );

@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
-import { db, paymentIntents, paymentTransactions, orders, cashMovements, tableSessions } from "@restaurante/database";
+import { db, paymentIntents, paymentTransactions, cardMachines, orders, cashMovements, tableSessions } from "@restaurante/database";
 import { eq, and, ne } from "drizzle-orm";
 import { z } from "zod";
 import { OrdersService } from "../orders/orders.service.js";
@@ -62,7 +62,7 @@ export class PaymentsService {
     return intent;
   }
 
-  async processPaymentIntent(restaurantId: string, branchId: string, userId: string, id: string) {
+  async processPaymentIntent(restaurantId: string, branchId: string, userId: string, id: string, cardMachineId?: string) {
     const intent = await this.findIntentById(restaurantId, id);
 
     if (intent.status !== "DRAFT" && intent.status !== "PROCESSING") {
@@ -126,6 +126,7 @@ export class PaymentsService {
         .values({
           restaurantId,
           paymentIntentId: id,
+          cardMachineId: cardMachineId || null,
           provider: intent.provider,
           providerTransactionId,
           status: newStatus,
@@ -200,6 +201,28 @@ export class PaymentsService {
       }
     });
 
-    return this.findIntentById(restaurantId, id);
+  }
+
+  async listTransactions(restaurantId: string) {
+    return db
+      .select({
+        id: paymentTransactions.id,
+        amountInCents: paymentTransactions.amountInCents,
+        status: paymentTransactions.status,
+        provider: paymentTransactions.provider,
+        providerTransactionId: paymentTransactions.providerTransactionId,
+        occurredAt: paymentTransactions.occurredAt,
+        cardMachineId: paymentTransactions.cardMachineId,
+        cardMachineName: cardMachines.name,
+        cardMachineModel: cardMachines.model,
+        cardMachineSerial: cardMachines.serialNumber,
+        creditFee: cardMachines.creditFee,
+        debitFee: cardMachines.debitFee,
+        pixFee: cardMachines.pixFee
+      })
+      .from(paymentTransactions)
+      .leftJoin(cardMachines, eq(paymentTransactions.cardMachineId, cardMachines.id))
+      .where(eq(paymentTransactions.restaurantId, restaurantId))
+      .orderBy(paymentTransactions.occurredAt);
   }
 }

@@ -15,6 +15,7 @@ import { MailModule } from "./mail/mail.module.js";
 import { DeviceSessionsModule } from "./device-sessions/device-sessions.module.js";
 import { BillsModule } from "./bills/bills.module.js";
 import { SettingsModule } from "./settings/settings.module.js";
+import { CardMachinesModule } from "./card-machines/card-machines.module.js";
 
 
 @Module({
@@ -33,9 +34,11 @@ import { SettingsModule } from "./settings/settings.module.js";
     MailModule,
     DeviceSessionsModule,
     BillsModule,
-    SettingsModule
+    SettingsModule,
+    CardMachinesModule
   ],
   providers: [HealthService]
 })
 export class AppModule {}
+
 

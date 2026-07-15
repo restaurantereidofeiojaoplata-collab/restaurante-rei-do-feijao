@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
+import { api } from '../services/api';
 import {
   Search,
   Plus,
@@ -16,6 +17,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Product, OrderItem } from '../types';
+
 
 interface PdvViewProps {
   products: Product[];
@@ -114,6 +116,31 @@ export function PdvView({ products, categories: categoriesProp = [], onCreateOrd
   const [splitCount, setSplitCount] = useState<number>(2);
   const [paymentProcessing, setPaymentProcessing] = useState<boolean>(false);
   const [paymentSuccess, setPaymentSuccess] = useState<boolean>(false);
+
+  // Card Machines lists
+  const [machines, setMachines] = useState<any[]>([]);
+  const [selectedMachineId, setSelectedMachineId] = useState<string>('');
+
+  useEffect(() => {
+    if (showPaymentModal) {
+      const fetchMachines = async () => {
+        try {
+          const data = await api.get('/card-machines');
+          if (Array.isArray(data)) {
+            const active = data.filter(m => m.isActive);
+            setMachines(active);
+            if (active.length > 0) {
+              setSelectedMachineId(active[0].id);
+            }
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      };
+      fetchMachines();
+    }
+  }, [showPaymentModal]);
+
 
   // Constants categories - dynamically aggregated
   const categories = useMemo(() => {
@@ -219,8 +246,10 @@ export function PdvView({ products, categories: categoriesProp = [], onCreateOrd
         status: 'delivered', // fast counter-top sale is delivered immediately
         paymentMethod,
         paymentStatus: 'paid',
-        customerName: customerName || 'Venda de Balcão'
+        customerName: customerName || 'Venda de Balcão',
+        cardMachineId: (paymentMethod === 'credit' || paymentMethod === 'debit') ? selectedMachineId : undefined
       });
+
 
       setPaymentProcessing(false);
       setPaymentSuccess(true);
@@ -689,6 +718,31 @@ export function PdvView({ products, categories: categoriesProp = [], onCreateOrd
                   );
                 })}
               </div>
+
+              {/* Card Machine selector */}
+              {(paymentMethod === 'credit' || paymentMethod === 'debit') && (
+                <div className="bg-neutral-50 p-4 rounded-xl border border-neutral-200 space-y-2 mb-6">
+                  <label className="text-[10px] font-black uppercase text-neutral-600 block">Selecione a Maquininha</label>
+                  {machines.length === 0 ? (
+                    <div className="text-[10px] text-rose-700 font-bold bg-rose-50 border border-rose-100 p-2.5 rounded-lg">
+                      Nenhuma maquininha ativa cadastrada no banco. As taxas padrão serão aplicadas. Cadastre maquininhas nas Configurações.
+                    </div>
+                  ) : (
+                    <select
+                      value={selectedMachineId}
+                      onChange={(e) => setSelectedMachineId(e.target.value)}
+                      className="w-full bg-white border border-neutral-200 rounded-xl p-2.5 text-xs text-neutral-900 font-bold focus:outline-none focus:border-emerald-500"
+                    >
+                      {machines.map((mac) => (
+                        <option key={mac.id} value={mac.id}>
+                          {mac.name} ({mac.model} - S/N: {mac.serialNumber})
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              )}
+
 
               {/* Split account config view */}
               {paymentMethod === 'split' && (

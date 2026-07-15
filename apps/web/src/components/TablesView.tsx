@@ -1,4 +1,5 @@
 import { useState, useEffect, FormEvent } from 'react';
+import { api } from '../services/api';
 import {
   Grid,
   List,
@@ -149,6 +150,31 @@ export function TablesView({
   const [paymentMethod, setPaymentMethod] = useState<'credit' | 'debit' | 'cash' | 'pix'>('pix');
   const [discountAmount, setDiscountAmount] = useState(0);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
+  // Card Machines lists
+  const [machines, setMachines] = useState<any[]>([]);
+  const [selectedMachineId, setSelectedMachineId] = useState<string>('');
+
+  useEffect(() => {
+    if (showPaymentFlow) {
+      const fetchMachines = async () => {
+        try {
+          const data = await api.get('/card-machines');
+          if (Array.isArray(data)) {
+            const active = data.filter(m => m.isActive);
+            setMachines(active);
+            if (active.length > 0) {
+              setSelectedMachineId(active[0].id);
+            }
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      };
+      fetchMachines();
+    }
+  }, [showPaymentFlow]);
+
   const [comandaSplitPayment, setComandaSplitPayment] = useState(false);
   const [comandaSplitCount, setComandaSplitCount] = useState(2);
 
@@ -939,8 +965,10 @@ export function TablesView({
         status: 'delivered',
         paymentStatus: 'paid',
         paymentMethod,
-        customerName: activeComanda.cliente
+        customerName: activeComanda.cliente,
+        cardMachineId: (paymentMethod === 'credit' || paymentMethod === 'debit') ? selectedMachineId : undefined
       });
+
 
       // Update local enhanced lists (remove the paid comanda)
       const updated = enhancedTables.map(t => {
@@ -1711,6 +1739,31 @@ export function TablesView({
                               ))}
                             </div>
                           </div>
+
+                          {/* Card Machine Selector */}
+                          {(paymentMethod === 'credit' || paymentMethod === 'debit') && (
+                            <div className="space-y-1 pt-2 border-t border-neutral-100">
+                              <label className="text-[10px] font-black uppercase text-neutral-600 block">Maquininha de Cartão</label>
+                              {machines.length === 0 ? (
+                                <div className="text-[9px] text-rose-700 font-bold bg-rose-50 border border-rose-100 p-2.5 rounded-lg">
+                                  Nenhuma maquininha cadastrada no banco. Cadastre maquininhas em Configurações.
+                                </div>
+                              ) : (
+                                <select
+                                  value={selectedMachineId}
+                                  onChange={(e) => setSelectedMachineId(e.target.value)}
+                                  className="w-full bg-white border border-neutral-250 rounded-xl p-2 text-xs text-neutral-900 font-bold focus:outline-none focus:border-emerald-500"
+                                >
+                                  {machines.map((mac) => (
+                                    <option key={mac.id} value={mac.id}>
+                                      {mac.name} ({mac.model})
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                            </div>
+                          )}
+
 
                           <div className="flex justify-between items-center text-xs font-bold pt-2 border-t border-neutral-100">
                             <span className="text-neutral-700">Conceder Desconto Extra</span>
