@@ -4,6 +4,7 @@ import { socketService } from '../services/socket';
 import { api } from '../services/api';
 import { Product, Order, Table, Employee, CashRegister, CashTransaction, Notification, OrderItem } from '../types';
 import { secureStorage } from '../utils/crypto';
+import { playChimeSound } from '../utils/audio';
 
 export type ViewType =
   | 'dashboard'
@@ -891,18 +892,26 @@ export function useAppState() {
       timestamp: new Date().toISOString(),
       read: false
     };
-    const list = [newNotif, ...notifications];
-    DBService.saveNotifications(list.slice(0, 50)); // limit 50
+    const list = [newNotif, ...notifications].slice(0, 50);
+    DBService.saveNotifications(list);
+    setNotifications(list);
+    
+    // Play native synth chime based on type
+    playChimeSound(type === 'error' ? 'error' : type === 'success' ? 'success' : 'info');
   };
+
 
   const markAllNotificationsRead = () => {
     const list = notifications.map(n => ({ ...n, read: true }));
     DBService.saveNotifications(list);
+    setNotifications(list);
   };
 
   const clearNotifications = () => {
     DBService.saveNotifications([]);
+    setNotifications([]);
   };
+
 
   const resetAllData = () => {
     DBService.resetToDefaults();
