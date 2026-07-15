@@ -14,6 +14,7 @@ import { WebsocketsModule } from "./websockets/websockets.module.js";
 import { MailModule } from "./mail/mail.module.js";
 import { DeviceSessionsModule } from "./device-sessions/device-sessions.module.js";
 import { BillsModule } from "./bills/bills.module.js";
+import { SettingsModule } from "./settings/settings.module.js";
 
 
 @Module({
@@ -31,8 +32,10 @@ import { BillsModule } from "./bills/bills.module.js";
     WebsocketsModule,
     MailModule,
     DeviceSessionsModule,
-    BillsModule
+    BillsModule,
+    SettingsModule
   ],
   providers: [HealthService]
 })
 export class AppModule {}
+

@@ -99,6 +99,42 @@ export function SettingsView({ currentUser, onUpdateProfile, onResetData, onOpen
     localStorage.setItem('gourmet_settings_pix_fee', pixFee.toString());
   }, [pixFee]);
 
+  // Load settings from database
+  useEffect(() => {
+    const loadDbSettings = async () => {
+      try {
+        const data = await api.get('/settings');
+        if (data && typeof data === 'object') {
+          if (data.gourmet_settings_credit_fee) setCreditCardFee(parseFloat(data.gourmet_settings_credit_fee));
+          if (data.gourmet_settings_debit_fee) setDebitCardFee(parseFloat(data.gourmet_settings_debit_fee));
+          if (data.gourmet_settings_pix_fee) setPixFee(parseFloat(data.gourmet_settings_pix_fee));
+        }
+      } catch (e) {
+        console.error('Erro ao carregar taxas do banco:', e);
+      }
+    };
+    loadDbSettings();
+  }, []);
+
+  const [savingFees, setSavingFees] = useState(false);
+  const handleSaveFeesToDb = async () => {
+    setSavingFees(true);
+    try {
+      await api.post('/settings', {
+        gourmet_settings_credit_fee: creditCardFee.toString(),
+        gourmet_settings_debit_fee: debitCardFee.toString(),
+        gourmet_settings_pix_fee: pixFee.toString()
+      });
+      alert('Taxas salvas com sucesso no banco de dados!');
+    } catch (e) {
+      console.error('Erro ao salvar taxas:', e);
+      alert('Erro ao salvar as taxas no banco de dados.');
+    } finally {
+      setSavingFees(false);
+    }
+  };
+
+
 
 
   // Device management dashboard states
@@ -1104,7 +1140,19 @@ export function SettingsView({ currentUser, onUpdateProfile, onResetData, onOpen
                       />
                     </div>
                   </div>
+
+                  <div className="flex justify-end pt-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveFeesToDb}
+                      disabled={savingFees}
+                      className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-neutral-950 font-black rounded-xl border border-emerald-550 transition flex items-center gap-2 shadow-lg shadow-emerald-500/10 text-center"
+                    >
+                      {savingFees ? 'Salvando no Banco...' : 'Salvar Taxas no Banco de Dados'}
+                    </button>
+                  </div>
                 </div>
+
               </div>
             </div>
 

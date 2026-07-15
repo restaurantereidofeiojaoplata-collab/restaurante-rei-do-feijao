@@ -75,6 +75,7 @@ export function useAppState() {
         api.get('/products/categories'),
         api.get('/tables'),
         api.get('/orders'),
+        api.get('/settings').catch(() => ({})),
       ];
 
       if (isAdmin) {
@@ -85,11 +86,20 @@ export function useAppState() {
       const categoriesData = results[0];
       const tablesData = results[1];
       const ordersData = results[2];
-      const pendingDevices = isAdmin ? results[3] : [];
+      const settingsData = results[3] || {};
+      const pendingDevices = isAdmin ? results[4] : [];
+
+      // Sincronizar configurações do banco para o localStorage
+      Object.entries(settingsData).forEach(([key, val]) => {
+        if (typeof key === 'string' && typeof val === 'string') {
+          localStorage.setItem(key, val);
+        }
+      });
 
       if (isAdmin && pendingDevices) {
         setPendingDeviceCount(pendingDevices.length);
       }
+
 
       // Fase 2: buscar produtos (depende das categorias para mapear)
       const productsData = await api.get('/products');

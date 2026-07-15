@@ -737,3 +737,27 @@ export const bills = pgTable(
   ]
 );
 
+// System Settings Configurations
+export const settings = pgTable(
+  "settings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    restaurantId: uuid("restaurant_id")
+      .references(() => restaurants.id, { onDelete: "cascade" })
+      .notNull(),
+    key: varchar("key", { length: 120 }).notNull(),
+    value: text("value").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .defaultNow()
+      .notNull()
+  },
+  (table) => [
+    index("settings_restaurant_id_idx").on(table.restaurantId),
+    uniqueIndex("settings_restaurant_key_unique").on(table.restaurantId, table.key)
+  ]
+);
+
+
