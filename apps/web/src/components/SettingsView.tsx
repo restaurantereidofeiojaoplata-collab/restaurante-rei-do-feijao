@@ -59,6 +59,47 @@ export function SettingsView({ currentUser, onUpdateProfile, onResetData, onOpen
     }
   }, [currentUser]);
 
+  // Card processing fees states
+  const [creditCardFee, setCreditCardFee] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('gourmet_settings_credit_fee');
+      return saved ? parseFloat(saved) : 2.5;
+    } catch {
+      return 2.5;
+    }
+  });
+  
+  const [debitCardFee, setDebitCardFee] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('gourmet_settings_debit_fee');
+      return saved ? parseFloat(saved) : 1.5;
+    } catch {
+      return 1.5;
+    }
+  });
+
+  const [pixFee, setPixFee] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('gourmet_settings_pix_fee');
+      return saved ? parseFloat(saved) : 0;
+    } catch {
+      return 0;
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('gourmet_settings_credit_fee', creditCardFee.toString());
+  }, [creditCardFee]);
+
+  useEffect(() => {
+    localStorage.setItem('gourmet_settings_debit_fee', debitCardFee.toString());
+  }, [debitCardFee]);
+
+  useEffect(() => {
+    localStorage.setItem('gourmet_settings_pix_fee', pixFee.toString());
+  }, [pixFee]);
+
+
 
   // Device management dashboard states
   const [deviceSessions, setDeviceSessions] = useState<any[]>([]);
@@ -1012,8 +1053,61 @@ export function SettingsView({ currentUser, onUpdateProfile, onResetData, onOpen
                     }
                   </p>
                 </div>
+
+                {/* 3. Card Processing Fees Card */}
+                <div className="bg-white border border-neutral-200 rounded-3xl p-6 shadow-sm space-y-4 mt-6">
+                  <div>
+                    <h4 className="font-extrabold text-neutral-900 text-xs uppercase tracking-wider text-emerald-800">Taxas da Máquina de Cartão & Pagamentos</h4>
+                    <p className="text-[10px] text-neutral-500 font-bold">Configure as taxas cobradas pelas adquirentes para descontar dos relatórios de faturamento líquido.</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-neutral-600">Cartão de Crédito (%)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        value={creditCardFee}
+                        onChange={(e) => setCreditCardFee(Math.max(0, Number(e.target.value)))}
+                        className="w-full bg-neutral-50 border border-neutral-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500 text-neutral-900 font-bold"
+                        placeholder="2.50"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-neutral-600">Cartão de Débito (%)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        value={debitCardFee}
+                        onChange={(e) => setDebitCardFee(Math.max(0, Number(e.target.value)))}
+                        className="w-full bg-neutral-50 border border-neutral-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500 text-neutral-900 font-bold"
+                        placeholder="1.50"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase text-neutral-600">Taxa PIX (%)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        value={pixFee}
+                        onChange={(e) => setPixFee(Math.max(0, Number(e.target.value)))}
+                        className="w-full bg-neutral-50 border border-neutral-200 rounded-xl p-3 focus:outline-none focus:border-emerald-500 text-neutral-900 font-bold"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
+
           )}
 
           {/* TAB 5: Authorized Devices (Admin only) */}

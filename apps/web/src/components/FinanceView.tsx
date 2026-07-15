@@ -75,20 +75,41 @@ export function FinanceView({
     .filter(t => t.type === 'out')
     .reduce((sum, t) => sum + t.amount, 0);
 
-  // Calc actual totals by method from cash transactions
+  // Calc actual credit/debit/pix totals with fees deduction
   const totalPix = cashRegister.transactions
     .filter(t => t.category === 'sale' && t.description.toLowerCase().includes('pix'))
     .reduce((sum, t) => sum + t.amount, 0);
 
-  const totalCard = cashRegister.transactions
-    .filter(t => t.category === 'sale' && (t.description.toLowerCase().includes('card') || t.description.toLowerCase().includes('credit') || t.description.toLowerCase().includes('debit')))
+  const totalCreditCard = cashRegister.transactions
+    .filter(t => t.category === 'sale' && (t.description.toLowerCase().includes('credit') || t.description.toLowerCase().includes('crédito')))
     .reduce((sum, t) => sum + t.amount, 0);
+
+  const totalDebitCard = cashRegister.transactions
+    .filter(t => t.category === 'sale' && (t.description.toLowerCase().includes('debit') || t.description.toLowerCase().includes('débito')))
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const totalGenericCard = cashRegister.transactions
+    .filter(t => t.category === 'sale' && (t.description.toLowerCase().includes('card') || t.description.toLowerCase().includes('cartão')) && !t.description.toLowerCase().includes('credit') && !t.description.toLowerCase().includes('crédito') && !t.description.toLowerCase().includes('debit') && !t.description.toLowerCase().includes('débito'))
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const totalCard = totalCreditCard + totalDebitCard + totalGenericCard;
 
   const totalCashSales = cashRegister.transactions
-    .filter(t => t.category === 'sale' && !t.description.toLowerCase().includes('pix') && !t.description.toLowerCase().includes('card') && !t.description.toLowerCase().includes('credit') && !t.description.toLowerCase().includes('debit'))
+    .filter(t => t.category === 'sale' && !t.description.toLowerCase().includes('pix') && !t.description.toLowerCase().includes('card') && !t.description.toLowerCase().includes('cartão') && !t.description.toLowerCase().includes('credit') && !t.description.toLowerCase().includes('crédito') && !t.description.toLowerCase().includes('debit') && !t.description.toLowerCase().includes('débito'))
     .reduce((sum, t) => sum + t.amount, 0);
 
+  // Load configured fees percents from settings
+  const creditFeePercent = parseFloat(localStorage.getItem('gourmet_settings_credit_fee') || '2.5');
+  const debitFeePercent = parseFloat(localStorage.getItem('gourmet_settings_debit_fee') || '1.5');
+  const pixFeePercent = parseFloat(localStorage.getItem('gourmet_settings_pix_fee') || '0');
+
+  const creditFees = (totalCreditCard + totalGenericCard * 0.5) * (creditFeePercent / 100);
+  const debitFees = (totalDebitCard + totalGenericCard * 0.5) * (debitFeePercent / 100);
+  const pixFees = totalPix * (pixFeePercent / 100);
+  const totalProcessingFees = creditFees + debitFees + pixFees;
+
   const cashAmount = (cashRegister.isOpen ? cashRegister.initialAmount : 0) + totalSupplies + totalCashSales - totalWithdrawals;
+
 
   const handleOpenRegister = (e: FormEvent) => {
     e.preventDefault();
@@ -576,31 +597,32 @@ export function FinanceView({
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl space-y-1 shadow-sm">
               <span className="text-[10px] font-black uppercase text-emerald-800">Faturamento Bruto</span>
               <h4 className="text-lg font-black text-emerald-950">R$ {totalSales.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h4>
               <span className="text-[9px] text-emerald-700 block font-bold">Somatória de vendas PDV e comanda</span>
             </div>
 
+            <div className="bg-amber-50 border border-amber-250 p-4 rounded-xl space-y-1 shadow-sm">
+              <span className="text-[10px] font-black uppercase text-amber-800">Taxas da Máquina</span>
+              <h4 className="text-lg font-black text-amber-950">R$ {totalProcessingFees.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h4>
+              <span className="text-[9px] text-amber-700 block font-bold">Descontos das adquirentes</span>
+            </div>
+
             <div className="bg-rose-50 border border-rose-250 p-4 rounded-xl space-y-1 shadow-sm">
-              <span className="text-[10px] font-black uppercase text-rose-800">Total de Custos & Despesas</span>
+              <span className="text-[10px] font-black uppercase text-rose-800">Total de Despesas</span>
               <h4 className="text-lg font-black text-rose-950">R$ {totalWithdrawals.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h4>
-              <span className="text-[9px] text-rose-700 block font-bold">Controle de sangrias e pagamentos</span>
+              <span className="text-[9px] text-rose-700 block font-bold">Sangrias e custos operacionais</span>
             </div>
 
             <div className="bg-emerald-100 border border-emerald-300 p-4 rounded-xl space-y-1 shadow-sm">
               <span className="text-[10px] font-black uppercase text-emerald-900">Resultado Líquido</span>
-              <h4 className="text-lg font-black text-emerald-950">R$ {(totalSales - totalWithdrawals).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h4>
-              <span className="text-[9px] text-emerald-800 block font-bold">Lucro de exercício operacional</span>
-            </div>
-
-            <div className="bg-blue-50 border border-blue-250 p-4 rounded-xl space-y-1 shadow-sm">
-              <span className="text-[10px] font-black uppercase text-blue-800">Média por Comanda (Ticket)</span>
-              <h4 className="text-lg font-black text-blue-950">R$ {(salesCount > 0 ? totalSales / salesCount : 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h4>
-              <span className="text-[9px] text-blue-700 block font-bold">Valor de ticket médio atual</span>
+              <h4 className="text-lg font-black text-emerald-950">R$ {(totalSales - totalWithdrawals - totalProcessingFees).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h4>
+              <span className="text-[9px] text-emerald-800 block font-bold">Lucro real deduzido de taxas</span>
             </div>
           </div>
+
 
           {/* Premium Visual SVG Charts and Metrics Section */}
           {(() => {
