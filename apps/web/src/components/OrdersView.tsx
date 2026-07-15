@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Clock,
   Play,
@@ -23,6 +23,15 @@ interface OrdersViewProps {
 export function OrdersView({ orders, onUpdateOrderStatus }: OrdersViewProps) {
   const [activeFilter, setActiveFilter] = useState<'all_active' | 'pending' | 'preparing' | 'ready' | 'delivered'>('all_active');
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
+  const [timeTick, setTimeTick] = useState<number>(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimeTick(t => t + 1);
+    }, 30000); // refresh every 30s
+    return () => clearInterval(interval);
+  }, []);
+
 
   // Filter orders
   const filteredOrders = orders.filter(o => {
@@ -149,14 +158,29 @@ export function OrdersView({ orders, onUpdateOrderStatus }: OrdersViewProps) {
               >
                 {/* Order Top Summary */}
                 <div className="p-4 border-b border-neutral-200 flex items-center justify-between shrink-0 bg-neutral-50">
-                  <div className="space-y-0.5">
+                  <div className="space-y-1.5">
                     <span className="text-xs font-black text-neutral-900 flex items-center gap-1.5">
                       {order.code}
                     </span>
-                    <span className="text-[10px] text-neutral-600 font-bold flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-neutral-500" />
-                      {getElapsedTime(order.createdAt)}
-                    </span>
+                    {(() => {
+                      const created = new Date(order.createdAt).getTime();
+                      const now = Date.now();
+                      const diffMins = Math.floor((now - created) / 60000);
+                      
+                      let slaColor = 'text-emerald-800 bg-emerald-50 border-emerald-150';
+                      if (diffMins >= 10 && diffMins < 20) {
+                        slaColor = 'text-amber-800 bg-amber-50 border-amber-200';
+                      } else if (diffMins >= 20) {
+                        slaColor = 'text-rose-800 bg-rose-50 border-rose-200 animate-pulse';
+                      }
+                      
+                      return (
+                        <span className={`text-[9px] font-black flex items-center gap-1 px-1.5 py-0.5 rounded border ${slaColor} transition duration-300 select-none`}>
+                          <Clock className="w-3 h-3" />
+                          {getElapsedTime(order.createdAt)}
+                        </span>
+                      );
+                    })()}
                   </div>
 
                   <div className="text-right space-y-1">

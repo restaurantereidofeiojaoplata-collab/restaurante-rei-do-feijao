@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Search,
   Plus,
@@ -63,6 +63,44 @@ export function PdvView({ products, categories: categoriesProp = [], onCreateOrd
   useEffect(() => {
     localStorage.setItem('gourmet_pdv_customer', customerName);
   }, [customerName]);
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F2') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      } else if (e.key === 'F8') {
+        e.preventDefault();
+        setCart([]);
+        setDiscountAmount(0);
+        setCustomerName('Venda de Balcão');
+      } else if (e.key === 'F9') {
+        e.preventDefault();
+        if (cart.length > 0) {
+          setPaymentMethod('cash');
+          setShowPaymentModal(true);
+        }
+      } else if (e.key === 'F10') {
+        e.preventDefault();
+        if (cart.length > 0) {
+          setPaymentMethod('pix');
+          setShowPaymentModal(true);
+        }
+      } else if (e.key === 'F11') {
+        e.preventDefault();
+        if (cart.length > 0) {
+          setPaymentMethod('credit');
+          setShowPaymentModal(true);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [cart]);
+
 
   // Interactive Product Configuration Dialog
   const [activeConfigProduct, setActiveConfigProduct] = useState<Product | null>(null);
@@ -256,6 +294,7 @@ export function PdvView({ products, categories: categoriesProp = [], onCreateOrd
         <div className="relative shrink-0">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500 w-4 h-4" />
           <input
+            ref={searchInputRef}
             type="text"
             placeholder="Pesquisar produto pelo nome ou descrição..."
             value={searchQuery}
@@ -263,6 +302,17 @@ export function PdvView({ products, categories: categoriesProp = [], onCreateOrd
             className="w-full bg-emerald-50/50 border border-emerald-200 rounded-xl py-3.5 pl-11 pr-4 text-xs font-bold text-neutral-900 focus:outline-none focus:border-emerald-500 transition shadow-sm"
           />
         </div>
+
+        {/* Hotkeys info bar */}
+        <div className="hidden md:flex items-center gap-3 text-[10px] text-neutral-500 font-bold uppercase shrink-0 px-1 select-none">
+          <span className="text-[9px] text-neutral-400">⌨️ Atalhos:</span>
+          <span className="bg-neutral-150 px-1.5 py-0.5 rounded border border-neutral-250"><kbd className="font-mono text-[9px] font-black">F2</kbd> Focar Busca</span>
+          <span className="bg-neutral-150 px-1.5 py-0.5 rounded border border-neutral-250"><kbd className="font-mono text-[9px] font-black">F8</kbd> Limpar Carrinho</span>
+          <span className="bg-neutral-150 px-1.5 py-0.5 rounded border border-neutral-250"><kbd className="font-mono text-[9px] font-black">F9</kbd> Dinheiro</span>
+          <span className="bg-neutral-150 px-1.5 py-0.5 rounded border border-neutral-250"><kbd className="font-mono text-[9px] font-black">F10</kbd> PIX</span>
+          <span className="bg-neutral-150 px-1.5 py-0.5 rounded border border-neutral-250"><kbd className="font-mono text-[9px] font-black">F11</kbd> Cartão</span>
+        </div>
+
 
         {/* Products Grid */}
         <div id="pdv-products-grid" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 flex-1">

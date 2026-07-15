@@ -602,14 +602,157 @@ export function FinanceView({
             </div>
           </div>
 
-          <div className="bg-white border border-neutral-200 rounded-3xl p-6 shadow-sm space-y-4">
-            <h4 className="font-extrabold text-neutral-900 text-sm">Margens de Lucro Real e Markup</h4>
-            <p className="text-[11px] text-neutral-600 font-semibold leading-relaxed">
-              O faturamento das vendas atuais de R$ {totalSales.toFixed(2)} com base em um Markup Médio de +160% sobre os ingredientes confere ao restaurante uma margem de contribuição saudável. Mantenha os custos de insumos (sangrias) abaixo de 35% do faturamento para preservar o ponto de equilíbrio financeiro do estabelecimento.
-            </p>
-          </div>
+          {/* Premium Visual SVG Charts and Metrics Section */}
+          {(() => {
+            const salesByDay = [0, 0, 0, 0, 0, 0, 0];
+            orders.filter(o => o.paymentStatus === 'paid').forEach(o => {
+              try {
+                const day = new Date(o.createdAt).getDay();
+                salesByDay[day] += o.total;
+              } catch {}
+            });
+            const weekdaySales = [
+              salesByDay[1], // Mon
+              salesByDay[2], // Tue
+              salesByDay[3], // Wed
+              salesByDay[4], // Thu
+              salesByDay[5], // Fri
+              salesByDay[6], // Sat
+              salesByDay[0]  // Sun
+            ];
+
+            const maxDayVal = Math.max(...weekdaySales, 100);
+            const chartPoints = weekdaySales.map((val, idx) => {
+              const x = 40 + (idx * 45);
+              const y = 130 - ((val / maxDayVal) * 90);
+              return `${x},${y}`;
+            }).join(' ');
+            const chartAreaPoints = `40,130 ${chartPoints} 310,130`;
+
+            const totalPixVal = totalPix;
+            const totalCardVal = totalCard;
+            const totalCashVal = Math.max(0, cashAmount);
+            const sumMethods = totalPixVal + totalCardVal + totalCashVal || 1;
+            const pctPix = Math.round((totalPixVal / sumMethods) * 100);
+            const pctCard = Math.round((totalCardVal / sumMethods) * 100);
+            const pctCash = Math.round((totalCashVal / sumMethods) * 100);
+
+            const salesTarget = 5000;
+            const pctTarget = Math.min(100, Math.round((totalSales / salesTarget) * 100));
+
+            return (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 select-none">
+                {/* SVG Trend Chart */}
+                <div className="bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm space-y-4">
+                  <div>
+                    <h4 className="font-extrabold text-neutral-900 text-xs uppercase tracking-wider text-emerald-800">Faturamento da Semana (R$)</h4>
+                    <p className="text-[10px] text-neutral-500 font-bold">Gráfico linear de vendas liquidadas de Segunda a Domingo</p>
+                  </div>
+                  <div className="pt-2">
+                    <svg viewBox="0 0 350 160" className="w-full h-44">
+                      <defs>
+                        <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#10b981" stopOpacity="0.25" />
+                          <stop offset="100%" stopColor="#10b981" stopOpacity="0.00" />
+                        </linearGradient>
+                      </defs>
+                      {/* Grid lines */}
+                      <line x1="40" y1="40" x2="310" y2="40" stroke="#f3f4f6" strokeWidth="1" strokeDasharray="3" />
+                      <line x1="40" y1="85" x2="310" y2="85" stroke="#f3f4f6" strokeWidth="1" strokeDasharray="3" />
+                      <line x1="40" y1="130" x2="310" y2="130" stroke="#e5e7eb" strokeWidth="1.5" />
+                      
+                      {/* Gradient Fill Area */}
+                      <polygon points={chartAreaPoints} fill="url(#chartGrad)" />
+                      
+                      {/* Main Polyline */}
+                      <polyline points={chartPoints} fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                      
+                      {/* Circles for points */}
+                      {weekdaySales.map((val, idx) => {
+                        const x = 40 + (idx * 45);
+                        const y = 130 - ((val / maxDayVal) * 90);
+                        return (
+                          <g key={idx} className="group cursor-pointer">
+                            <circle cx={x} cy={y} r="4.5" fill="#ffffff" stroke="#10b981" strokeWidth="2.5" />
+                            <text x={x} y={y - 8} textAnchor="middle" className="text-[8px] font-black fill-neutral-700 bg-white px-1 shadow-sm opacity-0 group-hover:opacity-100 transition duration-200">
+                              R${val.toFixed(0)}
+                            </text>
+                          </g>
+                        );
+                      })}
+
+                      {/* Day Labels */}
+                      {['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map((label, idx) => (
+                        <text key={idx} x={40 + (idx * 45)} y="148" textAnchor="middle" className="text-[9px] font-bold fill-neutral-400">
+                          {label}
+                        </text>
+                      ))}
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Progress bars & Target */}
+                <div className="bg-white border border-neutral-200 rounded-3xl p-5 shadow-sm flex flex-col justify-between gap-5">
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-extrabold text-neutral-900 text-xs uppercase tracking-wider text-emerald-800">Mix de Pagamentos & Metas</h4>
+                      <p className="text-[10px] text-neutral-500 font-bold">Resumo proporcional de recebimentos e meta de vendas diária</p>
+                    </div>
+
+                    {/* Progress bars */}
+                    <div className="space-y-3">
+                      {/* PIX */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] font-bold text-neutral-600">
+                          <span className="flex items-center gap-1"><FileText className="w-3.5 h-3.5 text-teal-600" /> PIX</span>
+                          <span className="font-black text-neutral-800">{pctPix}% (R$ {totalPixVal.toFixed(0)})</span>
+                        </div>
+                        <div className="w-full bg-neutral-100 h-2.5 rounded-full overflow-hidden border border-neutral-200">
+                          <div className="bg-teal-500 h-full rounded-full transition-all duration-500" style={{ width: `${pctPix}%` }}></div>
+                        </div>
+                      </div>
+
+                      {/* Cartão */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] font-bold text-neutral-600">
+                          <span className="flex items-center gap-1"><Layers className="w-3.5 h-3.5 text-blue-600" /> Cartão</span>
+                          <span className="font-black text-neutral-800">{pctCard}% (R$ {totalCardVal.toFixed(0)})</span>
+                        </div>
+                        <div className="w-full bg-neutral-100 h-2.5 rounded-full overflow-hidden border border-neutral-200">
+                          <div className="bg-blue-500 h-full rounded-full transition-all duration-500" style={{ width: `${pctCard}%` }}></div>
+                        </div>
+                      </div>
+
+                      {/* Dinheiro */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] font-bold text-neutral-600">
+                          <span className="flex items-center gap-1"><DollarSign className="w-3.5 h-3.5 text-emerald-600" /> Dinheiro</span>
+                          <span className="font-black text-neutral-800">{pctCash}% (R$ {totalCashVal.toFixed(0)})</span>
+                        </div>
+                        <div className="w-full bg-neutral-100 h-2.5 rounded-full overflow-hidden border border-neutral-200">
+                          <div className="bg-emerald-500 h-full rounded-full transition-all duration-500" style={{ width: `${pctCash}%` }}></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Target Tracker */}
+                  <div className="bg-emerald-50 border border-emerald-150 p-3.5 rounded-2xl space-y-2">
+                    <div className="flex justify-between text-[10px] font-black text-emerald-900 uppercase">
+                      <span>Meta de Vendas Diária</span>
+                      <span>{pctTarget}% (R$ {totalSales.toFixed(0)} / R$ {salesTarget})</span>
+                    </div>
+                    <div className="w-full bg-emerald-100 h-2 rounded-full overflow-hidden">
+                      <div className="bg-emerald-600 h-full rounded-full transition-all duration-500" style={{ width: `${pctTarget}%` }}></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
+
 
       {/* DIALOG: Supply / Withdrawal Form */}
       <AnimatePresence>
