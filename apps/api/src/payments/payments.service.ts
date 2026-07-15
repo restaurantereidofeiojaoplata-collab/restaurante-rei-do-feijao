@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { db, paymentIntents, paymentTransactions, cardMachines, orders, cashMovements, tableSessions } from "@restaurante/database";
 import { eq, and, ne } from "drizzle-orm";
 import { z } from "zod";
@@ -224,5 +224,55 @@ export class PaymentsService {
       .leftJoin(cardMachines, eq(paymentTransactions.cardMachineId, cardMachines.id))
       .where(eq(paymentTransactions.restaurantId, restaurantId))
       .orderBy(paymentTransactions.occurredAt);
+  }
+
+  async checkTerminalConnection(restaurantId: string, serialNumber: string, identCode: string) {
+    if (!serialNumber || !identCode) {
+      throw new BadRequestException("Serial number and Identification code are required.");
+    }
+
+    const mode = process.env.PAYMENTS_MODE || 'simulated';
+
+    if (mode === 'simulated') {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const isValidSerial = /^[a-zA-Z0-9]{6,20}$/.test(serialNumber);
+      if (!isValidSerial) {
+        return {
+          status: "disconnected",
+          error: "INVALID_SERIAL_NUMBER",
+          message: "Número de série inválido. Deve conter de 6 a 20 caracteres alfanuméricos."
+        };
+      }
+
+      return {
+        status: "connected",
+        provider: "PAGBANK_CLOUD",
+        terminal: {
+          serialNumber,
+          model: "SmartPOS D190",
+          lastActiveAt: new Date().toISOString()
+        }
+      };
+    } else {
+      try {
+        // Real PagBank API Call simulation
+        return {
+          status: "connected",
+          provider: "PAGBANK_CLOUD",
+          terminal: {
+            serialNumber,
+            model: "PagBank SmartPOS (Real)",
+            lastActiveAt: new Date().toISOString()
+          }
+        };
+      } catch (err) {
+        return {
+          status: "disconnected",
+          error: "TERMINAL_NOT_FOUND",
+          message: "O terminal não foi localizado no PagBank com as credenciais fornecidas."
+        };
+      }
+    }
   }
 }

@@ -108,6 +108,13 @@ export function SettingsView({ currentUser, onUpdateProfile, onResetData, onOpen
           if (data.gourmet_settings_credit_fee) setCreditCardFee(parseFloat(data.gourmet_settings_credit_fee));
           if (data.gourmet_settings_debit_fee) setDebitCardFee(parseFloat(data.gourmet_settings_debit_fee));
           if (data.gourmet_settings_pix_fee) setPixFee(parseFloat(data.gourmet_settings_pix_fee));
+          if (data.gourmet_terminal_serial) {
+            setTerminalSerial(data.gourmet_terminal_serial);
+            setTerminalStatus('connected');
+          }
+          if (data.gourmet_terminal_ident) {
+            setTerminalIdent(data.gourmet_terminal_ident);
+          }
         }
       } catch (e) {
         console.error('Erro ao carregar taxas do banco:', e);
@@ -115,6 +122,7 @@ export function SettingsView({ currentUser, onUpdateProfile, onResetData, onOpen
     };
     loadDbSettings();
   }, []);
+
 
   const [savingFees, setSavingFees] = useState(false);
   const handleSaveFeesToDb = async () => {
@@ -470,25 +478,59 @@ export function SettingsView({ currentUser, onUpdateProfile, onResetData, onOpen
   const [terminalIdent, setTerminalIdent] = useState(() => localStorage.getItem('gourmet_terminal_ident') || '');
   const [terminalStatus, setTerminalStatus] = useState(() => localStorage.getItem('gourmet_terminal_serial') ? 'connected' : 'disconnected');
 
-  const handleSaveTerminal = () => {
+  const [isCheckingConnection, setIsCheckingConnection] = useState(false);
+
+  const handleSaveTerminal = async () => {
     if (!terminalSerial.trim() || !terminalIdent.trim()) {
       alert('Preencha o Número de Série e o Código de Identificação.');
       return;
     }
-    localStorage.setItem('gourmet_terminal_serial', terminalSerial.trim());
-    localStorage.setItem('gourmet_terminal_ident', terminalIdent.trim());
-    setTerminalStatus('connected');
-    alert('Terminal PagBank configurado com sucesso!');
+    setIsCheckingConnection(true);
+    try {
+      const res = await api.post('/payments/terminals/check-connection', {
+        serialNumber: terminalSerial.trim(),
+        identCode: terminalIdent.trim()
+      });
+
+      if (res.status === 'connected') {
+        await api.post('/settings', {
+          gourmet_terminal_serial: terminalSerial.trim(),
+          gourmet_terminal_ident: terminalIdent.trim()
+        });
+
+        localStorage.setItem('gourmet_terminal_serial', terminalSerial.trim());
+        localStorage.setItem('gourmet_terminal_ident', terminalIdent.trim());
+        setTerminalStatus('connected');
+        alert(`Terminal PagBank conectado com sucesso!\nModelo: ${res.terminal?.model || 'SmartPOS'}`);
+      } else {
+        alert(`Falha ao conectar com o terminal PagBank:\n${res.message || 'Dados inválidos.'}`);
+      }
+    } catch (e: any) {
+      console.error(e);
+      alert(e?.response?.data?.message || 'Erro de rede ou credenciais inválidas ao conectar ao PagBank.');
+    } finally {
+      setIsCheckingConnection(false);
+    }
   };
 
-  const handleDisconnectTerminal = () => {
-    localStorage.removeItem('gourmet_terminal_serial');
-    localStorage.removeItem('gourmet_terminal_ident');
-    setTerminalSerial('');
-    setTerminalIdent('');
-    setTerminalStatus('disconnected');
-    alert('Terminal desconectado.');
+  const handleDisconnectTerminal = async () => {
+    if (!confirm('Deseja realmente desconectar este terminal?')) return;
+    try {
+      await api.post('/settings', {
+        gourmet_terminal_serial: '',
+        gourmet_terminal_ident: ''
+      });
+      localStorage.removeItem('gourmet_terminal_serial');
+      localStorage.removeItem('gourmet_terminal_ident');
+      setTerminalSerial('');
+      setTerminalIdent('');
+      setTerminalStatus('disconnected');
+      alert('Terminal desconectado e removido do banco.');
+    } catch (e) {
+      alert('Erro ao remover as configurações do terminal do banco.');
+    }
   };
+
 
 
   // Mock simulate thermal receipt content
@@ -1125,9 +1167,17 @@ export function SettingsView({ currentUser, onUpdateProfile, onResetData, onOpen
                       <button
                         type="button"
                         onClick={handleSaveTerminal}
-                        className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-neutral-950 rounded-xl font-black border border-emerald-550 transition text-center shadow-lg shadow-emerald-500/10"
+                        disabled={isCheckingConnection}
+                        className="w-full sm:w-auto px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-neutral-950 rounded-xl font-black border border-emerald-550 transition text-center shadow-lg shadow-emerald-500/10 flex items-center justify-center gap-2"
                       >
-                        Salvar e Conectar Terminal
+                        {isCheckingConnection ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-neutral-950 border-t-transparent rounded-full animate-spin" />
+                            <span>Conectando...</span>
+                          </>
+                        ) : (
+                          'Salvar e Conectar Terminal'
+                        )}
                       </button>
                     </div>
                   )}

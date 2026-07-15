@@ -58,4 +58,16 @@ export class PaymentsController {
     );
   }
 
+  @Post("terminals/check-connection")
+  @RequirePermissions("payments:manage")
+  async checkTerminalConnection(
+    @CurrentSession() session: SessionType,
+    @Body() body: { serialNumber: string; identCode: string }
+  ) {
+    return this.paymentsService.checkTerminalConnection(
+      session.restaurantId,
+      body.serialNumber,
+      body.identCode
+    );
+  }
 }
