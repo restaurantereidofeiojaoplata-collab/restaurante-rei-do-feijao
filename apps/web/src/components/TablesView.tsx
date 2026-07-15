@@ -149,6 +149,9 @@ export function TablesView({
   const [paymentMethod, setPaymentMethod] = useState<'credit' | 'debit' | 'cash' | 'pix'>('pix');
   const [discountAmount, setDiscountAmount] = useState(0);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [comandaSplitPayment, setComandaSplitPayment] = useState(false);
+  const [comandaSplitCount, setComandaSplitCount] = useState(2);
+
 
   // Default areas
   const areas = ['Salão Principal', 'Varanda', 'Área Externa', 'VIP', 'Piso Superior', 'Balcão'];
@@ -171,6 +174,14 @@ export function TablesView({
     { label: 'Rosa Premium', value: '#ec4899' },
     { label: 'Grafite', value: '#6b7280' }
   ];
+
+  // Reset payment split configurations on active comanda change
+  useEffect(() => {
+    setComandaSplitPayment(false);
+    setComandaSplitCount(2);
+    setDiscountAmount(0);
+    setShowPaymentFlow(false);
+  }, [activeComandaId]);
 
   // Initialize enhanced tables
   useEffect(() => {
@@ -1716,6 +1727,53 @@ export function TablesView({
                               />
                             </div>
                           </div>
+
+                          {/* Split comanda payment equally */}
+                          <div className="pt-2 border-t border-neutral-100 space-y-2">
+                            <div className="flex justify-between items-center text-xs font-bold">
+                              <span className="text-neutral-700">Dividir esta Comanda igualmente?</span>
+                              <button
+                                onClick={() => setComandaSplitPayment(!comandaSplitPayment)}
+                                className={`px-3 py-1 rounded-lg border text-[10px] font-black uppercase transition ${
+                                  comandaSplitPayment
+                                    ? 'bg-emerald-100 border-emerald-300 text-emerald-850'
+                                    : 'bg-white border-neutral-250 text-neutral-600 hover:bg-neutral-50'
+                                }`}
+                              >
+                                {comandaSplitPayment ? 'Sim' : 'Não'}
+                              </button>
+                            </div>
+
+                            {comandaSplitPayment && (
+                              <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-3 space-y-2.5 transition">
+                                <div className="flex justify-between items-center text-xs font-bold">
+                                  <span className="text-neutral-600">Nº de Pessoas:</span>
+                                  <div className="flex items-center gap-1.5 border border-neutral-250 bg-white rounded p-0.5">
+                                    <button
+                                      onClick={() => setComandaSplitCount(Math.max(2, comandaSplitCount - 1))}
+                                      className="px-1.5 py-0.5 bg-neutral-100 hover:bg-neutral-200 rounded text-xs text-neutral-800 font-black"
+                                    >
+                                      -
+                                    </button>
+                                    <span className="px-1 text-xs text-neutral-900 font-black">{comandaSplitCount}</span>
+                                    <button
+                                      onClick={() => setComandaSplitCount(comandaSplitCount + 1)}
+                                      className="px-1.5 py-0.5 bg-neutral-100 hover:bg-neutral-200 rounded text-xs text-neutral-800 font-black"
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </div>
+                                <div className="flex justify-between items-center text-xs font-black border-t border-neutral-200 pt-2 text-neutral-800">
+                                  <span>Cada pessoa paga:</span>
+                                  <span className="text-emerald-850 bg-emerald-100 border border-emerald-250 px-2 py-0.5 rounded font-black text-xs">
+                                    R$ {(Math.max(0, activeComanda.totalBill - discountAmount) / comandaSplitCount).toFixed(2)}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
 
                           <button
                             onClick={handlePayActiveComanda}
